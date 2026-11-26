@@ -304,12 +304,39 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
         // Each one sits a little further out than the previous, so the stack fans toward the
         // monitor edge with the nearest window in front.
         double a = Math.Clamp(S.CoverflowWindowAngle, 0, 90);
-        double rad = a * Math.PI / 180;
-        double off = S.CoverflowOffsetWidth;
+        double rad = a * Math.PI / 180, cos = Math.Cos(rad), sin = Math.Sin(rad);
+        double off = Math.Max(1, S.CoverflowOffsetWidth);
         double halfSel = _nodes[_selected].W * fitSel / 2;
         int d = Math.Abs(k);
-        double halfProjected = n.W * s / 2 * Math.Cos(rad);
-        double x = halfSel + halfProjected + 20 + (d - 1) * off;
+        double camZ = _camera.Position.Z;
+        double limit = Width / 2 - Width * 0.03;   // keep the near edge on screen
+
+        // Windows on this side of the stack.
+        int sideCount = S.LoopingMethod == LoopingMethod.Carousel
+            ? (k < 0 ? (count - 1) / 2 : count / 2)
+            : (k < 0 ? _selected : count - 1 - _selected);
+
+        // Start the stack a fixed distance out, even when the selected window is narrow.
+        double r = Math.Clamp(S.PreviewToMonitorRatio, 0.05, 1);
+        double inner = Math.Max(halfSel, r * Width / 2) + 30;
+
+        // Spread the stack over the free space toward the monitor edge; only bunch up to the
+        // "offset width" spacing when there are too many windows to fit.
+        var first = _nodes[(_selected + (k < 0 ? -1 : 1) + count) % count];
+        double firstHalf = first.W * Fit(first) * Math.Clamp(S.CoverflowScalingFactor, 0.05, 1) / 2;
+        double xMax = limit * (camZ - firstHalf * sin) / camZ - firstHalf * cos;
+        double spacing = sideCount > 1 ? Math.Clamp((xMax - inner) / (sideCount - 1), off, Math.Max(off, Width * 0.12)) : 0;
+        double x = inner + (d - 1) * spacing;
+
+        // Shrink any window whose near edge would run off the screen.
+        for (int i2 = 0; i2 < 8; i2++)
+        {
+            double half = n.W * s / 2;
+            double nearX = (x + half * cos) * camZ / (camZ - half * sin);
+            if (nearX <= limit || d > 1 && x > limit) break;
+            s *= 0.9;
+        }
+        x += n.W * s / 2 * cos;
         return new Pose
         {
             X = k < 0 ? -x : x, Y = yc, Z = 0,
