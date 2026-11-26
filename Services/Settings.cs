@@ -14,7 +14,7 @@ public enum Easing { Linear, EaseOutQuad, EaseOutCubic, EaseInOutCubic, EaseOutQ
 
 public sealed class CoverflowSettings
 {
-    public bool Enabled { get; set; } = false;
+    public bool Enabled { get; set; } = true;
     public CoverflowStyle Style { get; set; } = CoverflowStyle.Coverflow;
 
     // Switcher
