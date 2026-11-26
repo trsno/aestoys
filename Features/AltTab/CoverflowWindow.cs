@@ -299,55 +299,47 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
         double s = Fit(n) * Math.Pow(Math.Clamp(S.CoverflowScalingFactor, 0.05, 1), Math.Abs(k));
         if (k == 0) return new Pose { X = 0, Y = yc, Z = 0, Angle = 0, Pivot = 0, Scale = s, Opacity = 1 };
 
-        // Each side window is a tilted plane whose inner edge sits right against the selected
-        // window and whose outer edge reaches toward the monitor edge, coming toward the viewer.
-        // With room to spare there is no gap; when a side has many windows they fan out behind
-        // the first one, each peeking out a little further ("offset width").
+        // Classic coverflow: every side window has the same size and the same tilt (outer edge
+        // toward the viewer, inner edge away). The first one sits right next to the selected
+        // window; the rest follow side by side while there is room and only start to overlap
+        // ("stack spacing") when a side holds more windows than fit on screen.
         int d = Math.Abs(k);
         double camZ = _camera.Position.Z;
+        double a = Math.Clamp(S.CoverflowWindowAngle, 0, 89) * Math.PI / 180;
+        double cos = Math.Cos(a), sin = Math.Sin(a);
         double halfSel = _nodes[_selected].W * fitSel / 2;
-        double limit = Width / 2 - Width * 0.03;          // outer edge stays on screen
+        double limit = Width / 2 - Width * 0.02;   // outer edges stay on screen
         int sideCount = S.LoopingMethod == LoopingMethod.Carousel
             ? (k < 0 ? (count - 1) / 2 : count / 2)
             : (k < 0 ? _selected : count - 1 - _selected);
 
-        double avail = Math.Max(0, limit - halfSel);
-        double peek = sideCount > 1 ? Math.Min(Math.Max(1, S.CoverflowOffsetWidth), avail * 0.45 / (sideCount - 1)) : 0;
-        double innerProj = halfSel + 6 + (d - 1) * peek * 0.35;   // projected x of the inner edge
-        double innerZ = -(d - 1) * 30;                             // further windows sit behind
-        double outerProj = limit - (sideCount - d) * peek;        // projected x of the outer edge
-        if (outerProj < innerProj + 40) outerProj = innerProj + 40;
+        // Same scale for all side windows: the selected window's fit times the scaling factor,
+        // capped so a tilted window's outer edge can't run off the screen.
+        double f = Math.Clamp(S.CoverflowScalingFactor, 0.05, 1);
+        double sideH = _nodes[_selected].H * fitSel * f;              // common height
+        double sDesired = sideH / n.H;
+        double hw = n.W * sDesired / 2;                               // half width of this window
+        double maxHalf = Math.Max(40, (limit - halfSel) / (cos + sin * limit / camZ) / 2);
+        if (hw > maxHalf) { sDesired *= maxHalf / hw; hw = maxHalf; }
+        s = sDesired;
 
-        double xi = innerProj * (camZ - innerZ) / camZ;            // world x of the inner edge
-        double zMax = camZ * 0.4;
-        double xo = 0, zo = 0, len = 0;
-        for (int iter = 0; iter < 12; iter++)
-        {
-            len = n.W * s;
-            // Outer edge lies on the camera ray through outerProj: x = c (camZ - z).
-            double c = outerProj / camZ;
-            double u = c * camZ - xi;
-            double qa = c * c + 1, qb = -2 * (u * c + innerZ), qc = u * u + innerZ * innerZ - len * len;
-            double disc = qb * qb - 4 * qa * qc;
-            if (disc < 0)
-            {
-                // Too short to reach the edge: lie flat next to the selected window.
-                xo = xi + len; zo = innerZ;
-                break;
-            }
-            zo = (-qb + Math.Sqrt(disc)) / (2 * qa);
-            xo = c * (camZ - zo);
-            if (zo <= zMax) break;
-            s *= 0.9;   // too wide: it would swing too close to the camera
-        }
-
-        double dx = (xo - xi) / len, dz = (zo - innerZ) / len;
-        double tilt = Math.Asin(Math.Clamp(dz, -1, 1)) * 180 / Math.PI;
-        double midX = xi + dx * len / 2, midZ = innerZ + dz * len / 2;
+        // Windows are lined up by their inner edges so a wider window further back can't poke
+        // out in front of a narrower one. The inner edge sits back at z = -hw·sin, so perspective
+        // pulls it toward the centre; correct for that so it lands just outside the selected window.
+        var first = _nodes[(_selected + (k < 0 ? -1 : 1) + count) % count];
+        double hw1 = Math.Min(first.W * (sideH / first.H) / 2, maxHalf);
+        double inner1 = (halfSel + 12) * (camZ + hw1 * sin) / camZ;
+        // Furthest inner edge that still keeps a window's outer edge on screen.
+        double innerMax = limit * (camZ - hw1 * sin) / camZ - 2 * hw1 * cos;
+        double sideBySide = 2 * hw1 * cos + 8;
+        double spacing = sideCount > 1
+            ? Math.Min(sideBySide, Math.Max(Math.Max(1, S.CoverflowOffsetWidth), (innerMax - inner1) / (sideCount - 1)))
+            : 0;
+        double x = inner1 + (d - 1) * spacing + hw * cos;
         return new Pose
         {
-            X = k < 0 ? -midX : midX, Y = yc, Z = midZ,
-            Angle = k < 0 ? tilt : -tilt, Pivot = 0, Scale = s,
+            X = k < 0 ? -x : x, Y = yc, Z = 0,
+            Angle = k < 0 ? S.CoverflowWindowAngle : -S.CoverflowWindowAngle, Pivot = 0, Scale = s,
             Opacity = d > 12 ? 0 : 1,
         };
     }
