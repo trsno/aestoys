@@ -330,10 +330,11 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
 
         // Windows are anchored by their top-left corner (like the GNOME extension), so the
         // ones behind peek out up and to the left of the selected window.
-        var sel = _nodes[_selected];
-        double s0 = Fit(sel);
-        double baseLeft = -sel.W * s0 / 2 + Width * 0.06;
-        double baseTop = yc + sel.H * s0 / 2 - Height * 0.03;
+        // The anchor is a fixed box (monitor size × ratio) centred on screen, independent of
+        // which window is selected, so the stack stays put while windows move through it.
+        double r = Math.Clamp(S.PreviewToMonitorRatio, 0.05, 1);
+        double baseLeft = -r * Width / 2 + Width * 0.04;
+        double baseTop = yc + r * Height / 2 - Height * 0.02;
         double left = baseLeft - d * Math.Cos(ang) * step;
         double top = baseTop + d * Math.Sin(ang) * step;
         return new Pose
