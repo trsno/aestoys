@@ -52,11 +52,29 @@ internal static class WindowCapture
             {
                 var src = BitmapSource.Create(ow, oh, 96, 96, PixelFormats.Bgr32, null, data.Scan0, data.Stride * oh, data.Stride);
                 src.Freeze();
-                return IsBlank(src) ? null : src;
+                return IsBlank(src) ? null : Rounded(src);
             }
             finally { outBmp.UnlockBits(data); }
         }
         catch { return null; }
+    }
+
+    /// <summary>Clips a snapshot to Windows 11-style rounded corners (transparent outside).</summary>
+    public static BitmapSource Rounded(BitmapSource src)
+    {
+        int w = src.PixelWidth, h = src.PixelHeight;
+        double radius = Math.Max(8, Math.Min(w, h) * 0.02);
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.PushClip(new RectangleGeometry(new Rect(0, 0, w, h), radius, radius));
+            dc.DrawImage(src, new Rect(0, 0, w, h));
+            dc.Pop();
+        }
+        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(dv);
+        rtb.Freeze();
+        return rtb;
     }
 
     /// <summary>Some windows (protected content, elevated apps) come back fully black.</summary>
@@ -81,8 +99,10 @@ internal static class WindowCapture
         var dv = new DrawingVisual();
         using (var dc = dv.RenderOpen())
         {
+            dc.PushClip(new RectangleGeometry(new Rect(0, 0, w, h), 12, 12));
             dc.DrawRectangle(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2B, 0x2B, 0x2B)), null, new Rect(0, 0, w, h));
             dc.DrawRectangle(new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x38, 0x38, 0x38)), null, new Rect(0, 0, w, 32));
+            dc.Pop();
             if (item.Icon is not null) dc.DrawImage(item.Icon, new Rect(w / 2.0 - 48, h / 2.0 - 48, 96, 96));
         }
         var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);

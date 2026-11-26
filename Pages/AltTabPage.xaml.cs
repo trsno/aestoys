@@ -83,8 +83,7 @@ public partial class AltTabPage : Page
         Conditional(Combo(p, "Looping method", "Flip Stack keeps the order; Carousel keeps the selection centred and wraps around",
             new[] { "Flip Stack", "Carousel" }, (int)C.LoopingMethod, i => C.LoopingMethod = (LoopingMethod)i), () => C.Style == CoverflowStyle.Coverflow);
         Conditional(Slider(p, "Window scaling factor", "How much smaller each window gets away from the centre", 0.3, 1, 0.01, C.CoverflowScalingFactor, v => C.CoverflowScalingFactor = v, "0.00"), () => C.Style == CoverflowStyle.Coverflow);
-        Conditional(Slider(p, "Window angle", null, 0, 90, 0.5, C.CoverflowWindowAngle, v => C.CoverflowWindowAngle = v, "0.0Â°"), () => C.Style == CoverflowStyle.Coverflow);
-        Conditional(Slider(p, "Window offset width", "Spacing between the side windows", 0, 400, 1, C.CoverflowOffsetWidth, v => C.CoverflowOffsetWidth = v, "0"), () => C.Style == CoverflowStyle.Coverflow);
+        Conditional(Slider(p, "Stack spacing", "How far each window peeks out from behind the next when a side has several windows", 0, 400, 1, C.CoverflowOffsetWidth, v => C.CoverflowOffsetWidth = v, "0"), () => C.Style == CoverflowStyle.Coverflow);
 
         Conditional(Section(p, "Timeline"), () => C.Style == CoverflowStyle.Timeline);
         Conditional(Slider(p, "Window layout distance", null, 0, 1024, 1, C.TimelineDistance, v => C.TimelineDistance = v, "0"), () => C.Style == CoverflowStyle.Timeline);

@@ -299,48 +299,55 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
         double s = Fit(n) * Math.Pow(Math.Clamp(S.CoverflowScalingFactor, 0.05, 1), Math.Abs(k));
         if (k == 0) return new Pose { X = 0, Y = yc, Z = 0, Angle = 0, Pivot = 0, Scale = s, Opacity = 1 };
 
-        // Side windows turn about their own centre (90° = edge-on to the screen) so their inner
-        // edge recedes behind the selected window and their outer edge comes toward the viewer.
-        // Each one sits a little further out than the previous, so the stack fans toward the
-        // monitor edge with the nearest window in front.
-        double a = Math.Clamp(S.CoverflowWindowAngle, 0, 90);
-        double rad = a * Math.PI / 180, cos = Math.Cos(rad), sin = Math.Sin(rad);
-        double off = Math.Max(1, S.CoverflowOffsetWidth);
-        double halfSel = _nodes[_selected].W * fitSel / 2;
+        // Each side window is a tilted plane whose inner edge sits right against the selected
+        // window and whose outer edge reaches toward the monitor edge, coming toward the viewer.
+        // With room to spare there is no gap; when a side has many windows they fan out behind
+        // the first one, each peeking out a little further ("offset width").
         int d = Math.Abs(k);
         double camZ = _camera.Position.Z;
-        double limit = Width / 2 - Width * 0.03;   // keep the near edge on screen
-
-        // Windows on this side of the stack.
+        double halfSel = _nodes[_selected].W * fitSel / 2;
+        double limit = Width / 2 - Width * 0.03;          // outer edge stays on screen
         int sideCount = S.LoopingMethod == LoopingMethod.Carousel
             ? (k < 0 ? (count - 1) / 2 : count / 2)
             : (k < 0 ? _selected : count - 1 - _selected);
 
-        // Start the stack a fixed distance out, even when the selected window is narrow.
-        double r = Math.Clamp(S.PreviewToMonitorRatio, 0.05, 1);
-        double inner = Math.Max(halfSel, r * Width / 2) + 30;
+        double avail = Math.Max(0, limit - halfSel);
+        double peek = sideCount > 1 ? Math.Min(Math.Max(1, S.CoverflowOffsetWidth), avail * 0.45 / (sideCount - 1)) : 0;
+        double innerProj = halfSel + 6 + (d - 1) * peek * 0.35;   // projected x of the inner edge
+        double innerZ = -(d - 1) * 30;                             // further windows sit behind
+        double outerProj = limit - (sideCount - d) * peek;        // projected x of the outer edge
+        if (outerProj < innerProj + 40) outerProj = innerProj + 40;
 
-        // Spread the stack over the free space toward the monitor edge; only bunch up to the
-        // "offset width" spacing when there are too many windows to fit.
-        var first = _nodes[(_selected + (k < 0 ? -1 : 1) + count) % count];
-        double firstHalf = first.W * Fit(first) * Math.Clamp(S.CoverflowScalingFactor, 0.05, 1) / 2;
-        double xMax = limit * (camZ - firstHalf * sin) / camZ - firstHalf * cos;
-        double spacing = sideCount > 1 ? Math.Clamp((xMax - inner) / (sideCount - 1), off, Math.Max(off, Width * 0.12)) : 0;
-        double x = inner + (d - 1) * spacing;
-
-        // Shrink any window whose near edge would run off the screen.
-        for (int i2 = 0; i2 < 8; i2++)
+        double xi = innerProj * (camZ - innerZ) / camZ;            // world x of the inner edge
+        double zMax = camZ * 0.4;
+        double xo = 0, zo = 0, len = 0;
+        for (int iter = 0; iter < 12; iter++)
         {
-            double half = n.W * s / 2;
-            double nearX = (x + half * cos) * camZ / (camZ - half * sin);
-            if (nearX <= limit || d > 1 && x > limit) break;
-            s *= 0.9;
+            len = n.W * s;
+            // Outer edge lies on the camera ray through outerProj: x = c (camZ - z).
+            double c = outerProj / camZ;
+            double u = c * camZ - xi;
+            double qa = c * c + 1, qb = -2 * (u * c + innerZ), qc = u * u + innerZ * innerZ - len * len;
+            double disc = qb * qb - 4 * qa * qc;
+            if (disc < 0)
+            {
+                // Too short to reach the edge: lie flat next to the selected window.
+                xo = xi + len; zo = innerZ;
+                break;
+            }
+            zo = (-qb + Math.Sqrt(disc)) / (2 * qa);
+            xo = c * (camZ - zo);
+            if (zo <= zMax) break;
+            s *= 0.9;   // too wide: it would swing too close to the camera
         }
-        x += n.W * s / 2 * cos;
+
+        double dx = (xo - xi) / len, dz = (zo - innerZ) / len;
+        double tilt = Math.Asin(Math.Clamp(dz, -1, 1)) * 180 / Math.PI;
+        double midX = xi + dx * len / 2, midZ = innerZ + dz * len / 2;
         return new Pose
         {
-            X = k < 0 ? -x : x, Y = yc, Z = 0,
-            Angle = k < 0 ? a : -a, Pivot = 0, Scale = s,
+            X = k < 0 ? -midX : midX, Y = yc, Z = midZ,
+            Angle = k < 0 ? tilt : -tilt, Pivot = 0, Scale = s,
             Opacity = d > 12 ? 0 : 1,
         };
     }
