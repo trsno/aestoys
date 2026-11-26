@@ -23,8 +23,8 @@ internal sealed class AltTabController : IDisposable
     private CoverflowWindow? _coverflow;
     private ISwitcherView? _view;
 
-    // Hook state (hook runs on the UI thread, so no locking needed).
-    private bool _active;
+    // Set on the hook thread, read on both; everything else runs on the UI thread.
+    private volatile bool _active;
 
     // Session state.
     private List<SwitchItem> _items = new();
@@ -37,6 +37,13 @@ internal sealed class AltTabController : IDisposable
         _dispatcher = dispatcher;
         _showDelay = new DispatcherTimer(TimeSpan.FromMilliseconds(120), DispatcherPriority.Normal, (_, _) => ShowOverlay(), dispatcher) { IsEnabled = false };
         _hook = new KeyboardHook(OnKey);
+
+        // Build the switcher window ahead of time so the first Alt+Tab doesn't pay for it.
+        dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () =>
+        {
+            if (_settings.Coverflow.Enabled) new System.Windows.Interop.WindowInteropHelper((System.Windows.Window)(_coverflow ??= Wire(new CoverflowWindow()))).EnsureHandle();
+            else new System.Windows.Interop.WindowInteropHelper((System.Windows.Window)(_grid ??= Wire(new SwitcherWindow()))).EnsureHandle();
+        });
     }
 
     private static bool IsDown(int vk) => (Native.GetAsyncKeyState(vk) & 0x8000) != 0;

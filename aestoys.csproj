@@ -13,6 +13,8 @@
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
+    <!-- Precompiled code: no JIT pause on the first Alt+Tab after start-up. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>

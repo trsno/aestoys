@@ -42,6 +42,14 @@ internal static class Native
     public struct POINT { public int X, Y; }
 
     [StructLayout(LayoutKind.Sequential)]
+    public struct MSG { public IntPtr hwnd; public uint message; public IntPtr wParam, lParam; public uint time; public POINT pt; public uint lPrivate; }
+    public const uint WM_QUIT = 0x0012;
+    [DllImport("user32.dll")] public static extern int GetMessage(out MSG msg, IntPtr hwnd, uint min, uint max);
+    [DllImport("user32.dll")] public static extern bool TranslateMessage(ref MSG msg);
+    [DllImport("user32.dll")] public static extern IntPtr DispatchMessage(ref MSG msg);
+    [DllImport("user32.dll")] public static extern bool PostThreadMessage(uint threadId, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
     public struct RECT { public int Left, Top, Right, Bottom; public int Width => Right - Left; public int Height => Bottom - Top; }
 
     [StructLayout(LayoutKind.Sequential)]
