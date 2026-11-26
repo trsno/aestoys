@@ -1,0 +1,99 @@
+﻿<Page x:Class="Aestoys.Pages.AltTabPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Alt+Tab per monitor">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="32,24,32,32" MaxWidth="900">
+            <TextBlock Text="Alt+Tab per monitor" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,6"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <TextBlock TextWrapping="Wrap" Margin="0,0,0,20" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       Text="Alt+Tab only shows the windows that are on one monitor instead of every window on every screen." />
+
+            <ui:CardControl Margin="0,0,0,4" Header="Enable" >
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="Power24" /></ui:CardControl.Icon>
+                <ui:ToggleSwitch x:Name="EnabledToggle" Checked="OnChanged" Unchecked="OnChanged" />
+            </ui:CardControl>
+
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="DesktopMac24" /></ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Which monitor" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="Whose windows Alt+Tab lists" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ComboBox x:Name="ModeCombo" MinWidth="240" SelectionChanged="OnChanged">
+                    <ComboBoxItem Content="Monitor with the mouse cursor" />
+                    <ComboBoxItem Content="Monitor with the active window" />
+                </ComboBox>
+            </ui:CardControl>
+
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="ArrowMinimize24" /></ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Include minimized windows" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="Minimized windows count for the monitor they'll be restored to" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch x:Name="MinimizedToggle" Checked="OnChanged" Unchecked="OnChanged" />
+            </ui:CardControl>
+
+            <ui:CardExpander x:Name="CoverflowExpander" Margin="0,0,0,4" IsExpanded="False">
+                <ui:CardExpander.Icon><ui:SymbolIcon Symbol="Cube24" /></ui:CardExpander.Icon>
+                <ui:CardExpander.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Coverflow" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <TextBlock Text="Show the windows as tilted 3D previews instead of a grid of icons" FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <ui:ToggleSwitch x:Name="CoverflowToggle" Grid.Column="1" Margin="0,0,16,0"
+                                         Checked="OnCoverflowToggled" Unchecked="OnCoverflowToggled" />
+                    </Grid>
+                </ui:CardExpander.Header>
+                <StackPanel x:Name="CoverflowPanel" Margin="8,0,8,8" />
+            </ui:CardExpander>
+
+            <TextBlock Text="Shortcuts" FontSize="16" FontWeight="SemiBold" Margin="0,24,0,8"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <ui:Card>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                    </Grid.RowDefinitions>
+                    <Grid.Resources>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Margin" Value="0,4" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </Style>
+                    </Grid.Resources>
+                    <TextBlock Grid.Row="0" Text="Alt + Tab" FontWeight="SemiBold" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="Open the switcher / next window" />
+                    <TextBlock Grid.Row="1" Text="Alt + Shift + Tab" FontWeight="SemiBold" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="Previous window" />
+                    <TextBlock Grid.Row="2" Text="Arrow keys" FontWeight="SemiBold" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="Move the selection while holding Alt" />
+                    <TextBlock Grid.Row="3" Text="Esc" FontWeight="SemiBold" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="Close without switching" />
+                    <TextBlock Grid.Row="4" Text="Ctrl + Alt + Tab" FontWeight="SemiBold" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="Opens the normal Windows switcher (all monitors)" />
+                </Grid>
+            </ui:Card>
+
+            <ui:InfoBar Margin="0,16,0,0" IsOpen="True" IsClosable="False" Severity="Informational" Title="Note"
+                        Message="When an app running as administrator has focus, Windows blocks aestoys from seeing the keyboard, so the regular Alt+Tab appears instead." />
+        </StackPanel>
+    </ScrollViewer>
+</Page>
