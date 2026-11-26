@@ -37,8 +37,8 @@ public sealed class CoverflowSettings
     // Coverflow
     public LoopingMethod LoopingMethod { get; set; } = LoopingMethod.FlipStack;
     public double CoverflowScalingFactor { get; set; } = 0.8;
-    public double CoverflowWindowAngle { get; set; } = 70;
-    public double CoverflowOffsetWidth { get; set; } = 80;
+    public double CoverflowWindowAngle { get; set; } = 90;
+    public double CoverflowOffsetWidth { get; set; } = 50;
 
     // Timeline
     public double TimelineDistance { get; set; } = 96;

@@ -299,18 +299,21 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
         double s = Fit(n) * Math.Pow(Math.Clamp(S.CoverflowScalingFactor, 0.05, 1), Math.Abs(k));
         if (k == 0) return new Pose { X = 0, Y = yc, Z = 0, Angle = 0, Pivot = 0, Scale = s, Opacity = 1 };
 
-        double a = Math.Clamp(S.CoverflowWindowAngle, 0, 360);
+        // Side windows turn about their own centre (90° = edge-on to the screen) so their inner
+        // edge recedes behind the selected window and their outer edge comes toward the viewer.
+        // Each one sits a little further out than the previous, so the stack fans toward the
+        // monitor edge with the nearest window in front.
+        double a = Math.Clamp(S.CoverflowWindowAngle, 0, 90);
+        double rad = a * Math.PI / 180;
         double off = S.CoverflowOffsetWidth;
         double halfSel = _nodes[_selected].W * fitSel / 2;
-        double tan = Math.Abs(Math.Tan(a * Math.PI / 180));
-        // Push outer windows back far enough that nearer ones stay in front.
-        double push = a is >= 85 and <= 95 ? 0 : Math.Min(tan, 6) * off * 1.05;
         int d = Math.Abs(k);
-        double x = halfSel + 30 + (d - 1) * off;
+        double halfProjected = n.W * s / 2 * Math.Cos(rad);
+        double x = halfSel + halfProjected + 20 + (d - 1) * off;
         return new Pose
         {
-            X = k < 0 ? -x : x, Y = yc, Z = -(d - 1) * push - 1,
-            Angle = k < 0 ? -a : a, Pivot = k < 0 ? 0.5 : -0.5, Scale = s,
+            X = k < 0 ? -x : x, Y = yc, Z = 0,
+            Angle = k < 0 ? a : -a, Pivot = 0, Scale = s,
             Opacity = d > 12 ? 0 : 1,
         };
     }
