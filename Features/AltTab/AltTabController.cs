@@ -130,6 +130,8 @@ internal sealed class AltTabController : IDisposable
     {
         if (_active) return;
         _active = true;
+        Perf.Enabled = true;
+        long t0 = Perf.Now;
         Begin(false);
         if (allMonitors)
         {
@@ -137,10 +139,20 @@ internal sealed class AltTabController : IDisposable
             _index = _items.Count > 1 ? 1 : 0;
         }
         _showDelay.Stop();
+        Perf.Log($"--- demo: {_items.Count} windows, enumerate {Perf.Ms(t0):0.0} ms");
+        long t1 = Perf.Now;
         try { ShowOverlay(); }
         catch (Exception e) { App.Log("demo: " + e); }
+        Perf.Log($"ShowOn {Perf.Ms(t1):0.0} ms");
+
+        // Step through a few windows so switching animations get measured too.
+        int steps = 0;
+        var step = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(450) };
+        step.Tick += (_, _) => { if (!_active || ++steps > 4) { step.Stop(); return; } Move(1); };
+        step.Start();
+
         var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(seconds) };
-        t.Tick += (_, _) => { t.Stop(); if (_active) { _active = false; Cancel(); } };
+        t.Tick += (_, _) => { t.Stop(); if (_active) { _active = false; Cancel(); } Perf.Enabled = false; };
         t.Start();
     }
 

@@ -75,7 +75,7 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
     private int _selected;
     private DateTime _animStart;
     private bool _animating;
-    private int _session;
+    private volatile int _session;
     private double _scale = 1;
 
     private static CoverflowSettings S => App.Settings.Coverflow;
@@ -159,6 +159,7 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
         _overlayIcon.Opacity = S.OverlayIconOpacity;
         _overlayIcon.Margin = new Thickness(0, 2 * S.VerticalOffset, 0, 0);
 
+        WindowCapture.Prune();
         foreach (var item in items) _nodes.Add(CreateNode(item));
 
         _selected = index < 0 ? 0 : index;
@@ -166,15 +167,39 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
         UpdateCaption();
         Opacity = 1;
 
-        // Capture window contents progressively, nearest to the selection first.
+        StartCaptures(mon);
+    }
+
+    /// <summary>
+    /// Refreshes the snapshots on two worker threads, nearest to the selection first, so the UI
+    /// thread (animation and the keyboard hook) never waits on PrintWindow.
+    /// </summary>
+    private void StartCaptures(Native.RECT mon)
+    {
         int session = _session;
-        foreach (var node in _nodes.OrderBy(n => Math.Abs(_nodes.IndexOf(n) - _selected)))
+        // Textures bigger than the selected window is drawn at only cost time.
+        double r = Math.Clamp(S.PreviewToMonitorRatio, 0.05, 1);
+        int maxSide = (int)Math.Clamp(Math.Max(mon.Width, mon.Height) * r * 1.15, 480, 1600);
+        var queue = new System.Collections.Concurrent.ConcurrentQueue<(Node node, IntPtr hwnd)>(
+            _nodes.Select((n, i) => (n, i))
+                  .Where(t => t.n.To.Opacity > 0)
+                  .OrderBy(t => Math.Min(Math.Abs(t.i - _selected), _nodes.Count - Math.Abs(t.i - _selected)))
+                  .Select(t => (t.n, t.n.Item.Hwnd)));
+        long start = Perf.Now;
+        int pending = queue.Count;
+        for (int w = 0; w < 2; w++)
         {
-            Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+            System.Threading.Tasks.Task.Run(() =>
             {
-                if (session != _session || !IsVisible) return;
-                var bmp = WindowCapture.Capture(node.Item.Hwnd);
-                if (bmp is not null) node.Brush.ImageSource = bmp;
+                while (session == _session && queue.TryDequeue(out var job))
+                {
+                    long c0 = Perf.Now;
+                    var bmp = WindowCapture.Capture(job.hwnd, maxSide);
+                    Perf.Log($"capture {Perf.Ms(c0):0.0} ms (worker) {(bmp is null ? "none" : $"{bmp.PixelWidth}x{bmp.PixelHeight}")}");
+                    if (bmp is not null)
+                        Dispatcher.BeginInvoke(DispatcherPriority.Normal, () => { if (session == _session) job.node.Brush.ImageSource = bmp; });
+                    if (System.Threading.Interlocked.Decrement(ref pending) == 0) Perf.Log($"all captures done after {Perf.Ms(start):0.0} ms");
+                }
             });
         }
     }
@@ -191,6 +216,7 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
     {
         _session++;
         StopAnimation();
+        FlushFrameStats();
         Hide();
         ClearScene();
     }
@@ -240,7 +266,7 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
             TriangleIndices = new Int32Collection { 0, 1, 2, 0, 2, 3 },
         };
         mesh.Freeze();
-        var brush = new ImageBrush(WindowCapture.Placeholder(item, w / h)) { Stretch = Stretch.Fill };
+        var brush = new ImageBrush(WindowCapture.Cached(item.Hwnd, w / h) ?? WindowCapture.Placeholder(item, w / h)) { Stretch = Stretch.Fill };
         var material = new DiffuseMaterial(brush);
         var pivot = new TranslateTransform3D();
         var scale = new ScaleTransform3D();
@@ -388,13 +414,31 @@ internal sealed class CoverflowWindow : Window, ISwitcherView
     {
         if (!_animating) return;
         _animating = false;
+        _lastFrame = 0;
         CompositionTarget.Rendering -= OnFrame;
     }
 
     private void OnFrame(object? sender, EventArgs e)
     {
+        long now = Perf.Now;
+        if (Perf.Enabled && _lastFrame != 0)
+        {
+            double dt = (now - _lastFrame) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            _frames++; _maxFrame = Math.Max(_maxFrame, dt); if (dt > 20) _slowFrames++;
+        }
+        _lastFrame = now;
         double elapsed = (DateTime.UtcNow - _animStart).TotalSeconds;
         if (Apply(elapsed)) StopAnimation();
+    }
+
+    private long _lastFrame;
+    private int _frames, _slowFrames;
+    private double _maxFrame;
+
+    private void FlushFrameStats()
+    {
+        if (_frames > 0) Perf.Log($"frames {_frames}, max {_maxFrame:0.0} ms, >20ms {_slowFrames}");
+        _frames = _slowFrames = 0; _maxFrame = 0; _lastFrame = 0;
     }
 
     /// <summary>Advances all nodes; returns true when every animation has finished.</summary>
