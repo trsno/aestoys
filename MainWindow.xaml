@@ -33,6 +33,11 @@
                         <ui:SymbolIcon Symbol="TabDesktopMultiple20" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Utilities" TargetPageType="{x:Type pages:ToolsPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Toolbox24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.FooterMenuItems>
                 <ui:NavigationViewItem Content="General" TargetPageType="{x:Type pages:GeneralPage}">

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Aestoys.Pages;
 using Wpf.Ui.Abstractions;
@@ -17,6 +17,7 @@ public partial class MainWindow : FluentWindow
 Loaded += (_, _) => Nav.Navigate(App.StartPage?.ToLowerInvariant() switch
         {
             "desktops" => typeof(DesktopsPage),
+            "tools" => typeof(ToolsPage),
             "general" => typeof(GeneralPage),
             _ => typeof(AltTabPage),
         });

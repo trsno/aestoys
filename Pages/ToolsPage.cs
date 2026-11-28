@@ -1,0 +1,202 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using Aestoys.Services;
+using Wpf.Ui.Controls;
+using TextBlock = System.Windows.Controls.TextBlock;
+
+namespace Aestoys.Pages;
+
+/// <summary>
+/// "Utilities" settings page: one expandable card per tool with its on/off switch in the header
+/// and the main options inside. Built in code because the cards share one shape.
+/// </summary>
+public sealed class ToolsPage : Page
+{
+    private readonly StackPanel _root = new() { Margin = new Thickness(32, 24, 32, 32), MaxWidth = 900 };
+    private bool _loading = true;
+
+    private static AppSettings Settings => App.Settings;
+    private static ToolsSettings T => App.Settings.Tools;
+
+    public ToolsPage()
+    {
+        Title = "Utilities";
+        Content = new ScrollViewer { Content = _root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var title = new TextBlock { Text = "Utilities", FontSize = 28, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 6) };
+        title.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+        _root.Children.Add(title);
+        _root.Children.Add(Note(T.PowerToysImported
+            ? "Settings, layouts and history were imported from PowerToys."
+            : "Run aestoys with --import-powertoys once to bring over your PowerToys settings."));
+
+        Section("Windows");
+        Tool(SymbolRegular.Pin24, "Always On Top", $"{T.AlwaysOnTop.Hotkey} pins the active window on top with a coloured frame; {T.AlwaysOnTop.IncreaseOpacity} and {T.AlwaysOnTop.DecreaseOpacity} change its opacity",
+            () => T.AlwaysOnTop.Enabled, v => T.AlwaysOnTop.Enabled = v, body =>
+            {
+                body.Children.Add(Switch("Show a frame", () => T.AlwaysOnTop.ShowFrame, v => T.AlwaysOnTop.ShowFrame = v));
+                body.Children.Add(Slider("Frame thickness", 1, 15, () => T.AlwaysOnTop.FrameThickness, v => T.AlwaysOnTop.FrameThickness = v, "px"));
+                body.Children.Add(Slider("Frame opacity", 10, 100, () => T.AlwaysOnTop.FrameOpacity, v => T.AlwaysOnTop.FrameOpacity = v, "%"));
+                body.Children.Add(Switch("Use the accent colour for the frame", () => T.AlwaysOnTop.FrameUsesAccentColor, v => T.AlwaysOnTop.FrameUsesAccentColor = v));
+                body.Children.Add(Switch("Rounded frame", () => T.AlwaysOnTop.RoundCorners, v => T.AlwaysOnTop.RoundCorners = v));
+                body.Children.Add(Switch("Play a sound", () => T.AlwaysOnTop.Sound, v => T.AlwaysOnTop.Sound = v));
+                body.Children.Add(Switch("Not while a fullscreen game runs", () => T.AlwaysOnTop.SkipInGameMode, v => T.AlwaysOnTop.SkipInGameMode = v));
+            });
+
+        Tool(SymbolRegular.Grid24, "FancyZones", $"Hold Shift while dragging a window to drop it into a zone; Win+Left/Right moves between zones; {T.FancyZones.EditorHotkey} edits zones",
+            () => T.FancyZones.Enabled, v => T.FancyZones.Enabled = v, body =>
+            {
+                body.Children.Add(Action("Edit zones on this monitor", "Open editor", () => App.Zones?.OpenEditor()));
+                body.Children.Add(Switch("Zones only while Shift is held", () => T.FancyZones.ShiftDrag, v => T.FancyZones.ShiftDrag = v));
+                body.Children.Add(Switch("Win+Left/Right move between zones", () => T.FancyZones.OverrideSnapKeys, v => T.FancyZones.OverrideSnapKeys = v));
+                body.Children.Add(Switch("Open apps in their last zone", () => T.FancyZones.MoveToLastZone, v => T.FancyZones.MoveToLastZone = v));
+                body.Children.Add(Switch("Put windows back after display changes", () => T.FancyZones.MoveOnDisplayChange, v => T.FancyZones.MoveOnDisplayChange = v));
+                body.Children.Add(Switch("See-through window while dragging over zones", () => T.FancyZones.MakeDraggedWindowTransparent, v => T.FancyZones.MakeDraggedWindowTransparent = v));
+                body.Children.Add(Switch("Show zone numbers", () => T.FancyZones.ShowZoneNumbers, v => T.FancyZones.ShowZoneNumbers = v));
+                body.Children.Add(Slider("Zone opacity", 0, 100, () => T.FancyZones.HighlightOpacity, v => T.FancyZones.HighlightOpacity = v, "%"));
+            });
+
+        Tool(SymbolRegular.ArrowMove24, "Grab And Move", "Hold the key and drag anywhere in a window to move it; drag with the right button to resize it",
+            () => T.GrabAndMove.Enabled, v => T.GrabAndMove.Enabled = v, body =>
+            {
+                body.Children.Add(Choice("Hold", new[] { "Alt", "Win" }, () => (int)T.GrabAndMove.Modifier, v => T.GrabAndMove.Modifier = (GrabModifier)v));
+                body.Children.Add(Switch("Right-drag resizes", () => T.GrabAndMove.ResizeWithRightButton, v => T.GrabAndMove.ResizeWithRightButton = v));
+                body.Children.Add(Switch("Not while a fullscreen game runs", () => T.GrabAndMove.SkipInGameMode, v => T.GrabAndMove.SkipInGameMode = v));
+            });
+
+        Tool(SymbolRegular.Crop24, "Crop And Lock", $"{T.CropAndLock.ThumbnailHotkey}, then drag over the active window: the chosen part opens as its own live window",
+            () => T.CropAndLock.Enabled, v => T.CropAndLock.Enabled = v, null);
+
+        Section("Tools");
+        Tool(SymbolRegular.Eyedropper24, "Color Picker", $"{T.ColorPicker.Hotkey} picks a colour from anywhere on screen and copies it as {T.ColorPicker.CopiedFormat}",
+            () => T.ColorPicker.Enabled, v => T.ColorPicker.Enabled = v, body =>
+            {
+                body.Children.Add(Action("Picked colours and formats", "Open editor", () => App.ColorPick?.OpenEditor()));
+                body.Children.Add(Choice("Hotkey opens", new[] { "The editor", "The picker" }, () => (int)T.ColorPicker.Activation, v => T.ColorPicker.Activation = (ColorPickerActivation)v));
+                var formats = T.ColorPicker.Formats.Keys.ToArray();
+                body.Children.Add(Choice("Copy as", formats, () => Math.Max(0, Array.IndexOf(formats, T.ColorPicker.CopiedFormat)), v => T.ColorPicker.CopiedFormat = formats[v]));
+                body.Children.Add(Switch("Show the colour name", () => T.ColorPicker.ShowColorName, v => T.ColorPicker.ShowColorName = v));
+            });
+
+        Tool(SymbolRegular.LockOpen24, "File Locksmith", "Right-click a file or folder > Unlock with File Locksmith to see which apps are using it",
+            () => T.Locksmith.Enabled, v => T.Locksmith.Enabled = v, body =>
+            {
+                body.Children.Add(Switch("Only on Shift+right-click", () => T.Locksmith.ExtendedMenuOnly, v => T.Locksmith.ExtendedMenuOnly = v));
+            });
+
+        Tool(SymbolRegular.WeatherMoon24, "Awake", "Keeps the PC from sleeping; choose how long from the tray icon's Keep awake menu",
+            () => T.Awake.Enabled, v => T.Awake.Enabled = v, body =>
+            {
+                body.Children.Add(Choice("Mode", new[] { "Off (use the power plan)", "Indefinitely" }, () => T.Awake.Mode == AwakeMode.Indefinite ? 1 : 0,
+                    v => { if (v == 1) App.Awake?.SetIndefinite(); else App.Awake?.SetOff(); }));
+                body.Children.Add(Switch("Keep the screen on", () => T.Awake.KeepDisplayOn, v => T.Awake.KeepDisplayOn = v));
+            });
+
+        Loaded += (_, _) => _loading = false;
+    }
+
+    // ------------------------------------------------------------------ building blocks
+
+    private void Section(string text)
+    {
+        var t = new TextBlock { Text = text, FontSize = 14, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 16, 0, 8) };
+        t.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+        _root.Children.Add(t);
+    }
+
+    private static TextBlock Note(string text)
+    {
+        var t = new TextBlock { Text = text, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
+        t.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+        return t;
+    }
+
+    private void Tool(SymbolRegular icon, string name, string description, Func<bool> get, Action<bool> set, Action<StackPanel>? fill)
+    {
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
+        var n = new TextBlock { Text = name };
+        n.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+        var d = new TextBlock { Text = description, FontSize = 12, TextWrapping = TextWrapping.Wrap };
+        d.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+        text.Children.Add(n);
+        text.Children.Add(d);
+        header.Children.Add(text);
+        var toggle = new ToggleSwitch { IsChecked = get(), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, fill is null ? 0 : 12, 0) };
+        toggle.Checked += (_, _) => Changed(() => set(true));
+        toggle.Unchecked += (_, _) => Changed(() => set(false));
+        Grid.SetColumn(toggle, 1);
+        header.Children.Add(toggle);
+
+        if (fill is null)
+        {
+            var card = new CardControl { Icon = new SymbolIcon(icon), Header = header, Margin = new Thickness(0, 0, 0, 4) };
+            _root.Children.Add(card);
+            return;
+        }
+        var body = new StackPanel { Margin = new Thickness(40, 0, 0, 0) };
+        fill(body);
+        _root.Children.Add(new CardExpander { Icon = new SymbolIcon(icon), Header = header, Content = body, Margin = new Thickness(0, 0, 0, 4) });
+    }
+
+    private void Changed(Action apply)
+    {
+        if (_loading) return;
+        apply();
+        Settings.Save();
+        App.ApplyFeatureSettings();
+    }
+
+    private static Grid Row(string label, UIElement control)
+    {
+        var g = new Grid { Margin = new Thickness(0, 4, 0, 4), MinHeight = 36 };
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var t = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+        t.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+        g.Children.Add(t);
+        Grid.SetColumn(control, 1);
+        g.Children.Add(control);
+        return g;
+    }
+
+    private UIElement Switch(string label, Func<bool> get, Action<bool> set)
+    {
+        var s = new ToggleSwitch { IsChecked = get(), VerticalAlignment = VerticalAlignment.Center };
+        s.Checked += (_, _) => Changed(() => set(true));
+        s.Unchecked += (_, _) => Changed(() => set(false));
+        return Row(label, s);
+    }
+
+    private UIElement Slider(string label, int min, int max, Func<int> get, Action<int> set, string unit)
+    {
+        var value = new TextBlock { Width = 48, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Text = $"{get()} {unit}" };
+        value.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+        var s = new System.Windows.Controls.Slider { Minimum = min, Maximum = max, Value = get(), Width = 220, IsSnapToTickEnabled = true, TickFrequency = 1, VerticalAlignment = VerticalAlignment.Center };
+        s.ValueChanged += (_, e) => { value.Text = $"{(int)e.NewValue} {unit}"; Changed(() => set((int)e.NewValue)); };
+        var p = new StackPanel { Orientation = Orientation.Horizontal };
+        p.Children.Add(s);
+        p.Children.Add(value);
+        return Row(label, p);
+    }
+
+    private UIElement Choice(string label, IReadOnlyList<string> options, Func<int> get, Action<int> set)
+    {
+        var c = new ComboBox { MinWidth = 200, VerticalAlignment = VerticalAlignment.Center };
+        foreach (var o in options) c.Items.Add(o);
+        c.SelectedIndex = Math.Clamp(get(), 0, options.Count - 1);
+        c.SelectionChanged += (_, _) => { if (c.SelectedIndex >= 0) Changed(() => set(c.SelectedIndex)); };
+        return Row(label, c);
+    }
+
+    private static UIElement Action(string label, string button, Action click)
+    {
+        var b = new Wpf.Ui.Controls.Button { Content = button, VerticalAlignment = VerticalAlignment.Center };
+        b.Click += (_, _) => click();
+        return Row(label, b);
+    }
+}
