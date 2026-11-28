@@ -47,10 +47,10 @@ internal sealed class ColorEditorWindow : FluentWindow
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        root.Children.Add(new TitleBar { Title = "Color Picker", ShowMaximize = false, ShowMinimize = false });
+        root.Children.Add(new TitleBar { Title = "Color Picker", ShowMaximize = false, ShowMinimize = false, Padding = new Thickness(20, 4, 0, 4) });
 
-        var body = new StackPanel { Margin = new Thickness(20, 4, 20, 20) };
-        var pick = new Button { Content = "Pick a colour", Icon = new SymbolIcon(SymbolRegular.Eyedropper24), Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 0, 16), HorizontalAlignment = HorizontalAlignment.Stretch };
+        var body = new StackPanel { Margin = new Thickness(20, 12, 20, 20) };
+        var pick = new Button { Content = "Pick a colour", Icon = new SymbolIcon(SymbolRegular.Eyedropper24), Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 0, 20), HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(14, 6, 16, 7) };
         pick.Click += (_, _) => _picker.StartPicking();
         body.Children.Add(pick);
         body.Children.Add(Caption("Recent"));

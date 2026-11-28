@@ -79,7 +79,7 @@ internal sealed class LocksmithWindow : FluentWindow
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        root.Children.Add(new TitleBar { Title = "File Locksmith", ShowMaximize = false });
+        root.Children.Add(new TitleBar { Title = "File Locksmith", ShowMaximize = false, Padding = new Thickness(20, 4, 0, 4) });
 
         var body = new DockPanel { Margin = new Thickness(20, 8, 20, 16) };
         Grid.SetRow(body, 1);

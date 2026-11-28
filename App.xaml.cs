@@ -37,6 +37,7 @@ public partial class App : Application
     internal static Features.Tools.Awake? Awake { get; private set; }
     internal static Features.Tools.AlwaysOnTop? OnTop { get; private set; }
     internal static Features.Tools.ColorPicker? ColorPick { get; private set; }
+    internal static Features.Tools.CropAndLock? Crop { get; private set; }
     private const string DemoColorEventName = @"Local\aestoys.demo-colorpicker";
     private const string ColorEditorEventName = @"Local\aestoys.color-editor";
 
@@ -113,7 +114,7 @@ public partial class App : Application
             Mouse = new MouseHook();
             Awake = new Features.Tools.Awake(Settings);
             if (Hotkeys is not null) OnTop = new Features.Tools.AlwaysOnTop(Settings, Hotkeys);
-            if (Hotkeys is not null && Hook is not null && Mouse is not null) ColorPick = new Features.Tools.ColorPicker(Settings, Hotkeys, Hook, Mouse);
+            if (Hotkeys is not null && Hook is not null && Mouse is not null) { ColorPick = new Features.Tools.ColorPicker(Settings, Hotkeys, Hook, Mouse); Crop = new Features.Tools.CropAndLock(Settings, Hotkeys, Hook, Mouse); }
         }
         catch (Exception ex) { Log("tools: " + ex); }
         ApplyFeatureSettings();
@@ -318,11 +319,12 @@ public partial class App : Application
         try { Launcher?.Dispose(); } catch { }
         try { OnTop?.Dispose(); } catch { }
         try { ColorPick?.Dispose(); } catch { }
+        try { Crop?.Dispose(); } catch { }
         try { Awake?.Dispose(); } catch { }
         try { Mouse?.Dispose(); } catch { }
         try { Hook?.Dispose(); } catch { }
         AltTab = null; Desktops = null; Placement = null; Launcher = null; Hook = null;
-        OnTop = null; Awake = null; Mouse = null; Hotkeys = null; ColorPick = null;
+        OnTop = null; Awake = null; Mouse = null; Hotkeys = null; ColorPick = null; Crop = null;
     }
 
     protected override void OnExit(ExitEventArgs e)
