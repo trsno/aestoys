@@ -169,13 +169,23 @@ internal sealed class QuickPasteWindow : FluentWindow
         PreviewKeyDown += OnKey;
         Deactivated += (_, _) => Hide();
         Closing += (_, e) => { e.Cancel = true; Hide(); };   // kept around for instant reopening
-        SizeChanged += (_, _) =>
+        // Remember the size only when the user resizes it (WM_EXITSIZEMOVE); DPI moves don't count.
+        SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook((IntPtr h, int msg, IntPtr w, IntPtr l, ref bool handled) =>
         {
-            if (!IsVisible) return;
-            _settings.Tools.Clipboard.Width = Width;
-            _settings.Tools.Clipboard.Height = Height;
-        };
-        IsVisibleChanged += (_, _) => { if (!IsVisible) _settings.Save(); };
+            if (msg == 0x0232 /* WM_EXITSIZEMOVE */)
+            {
+                _settings.Tools.Clipboard.Width = Math.Round(ActualWidth);
+                _settings.Tools.Clipboard.Height = Math.Round(ActualHeight);
+                _settings.Save();
+            }
+            return IntPtr.Zero;
+        });
+        // Undo sizes saved by the first version, which shrank the window on high-DPI monitors.
+        if (_settings.Tools.Clipboard.Width < 380 || _settings.Tools.Clipboard.Height < 420)
+        {
+            _settings.Tools.Clipboard.Width = 460;
+            _settings.Tools.Clipboard.Height = 560;
+        }
     }
 
     private const string Template = """
@@ -274,11 +284,16 @@ internal sealed class QuickPasteWindow : FluentWindow
         double scale = Math.Max(1, Win32.GetDpiForWindow(h)) / 96.0;
         // Use the target monitor's DPI for the size (the window adopts it once moved there).
         try { if (GetDpiForMonitor(Native.MonitorFromPoint(pt, 2), 0, out uint dx, out _) == 0) scale = dx / 96.0; } catch { }
-        int w = (int)(Width * scale), hgt = (int)(Height * scale);
+        double dipW = _settings.Tools.Clipboard.Width, dipH = _settings.Tools.Clipboard.Height;
+        int w = (int)(dipW * scale), hgt = (int)(dipH * scale);
         var work = mi.rcWork;
         int x = Math.Clamp(pt.X, work.Left, Math.Max(work.Left, work.Right - w));
         int y = pt.Y + hgt > work.Bottom ? Math.Max(work.Top, pt.Y - hgt - 28) : pt.Y;
-        Native.SetWindowPos(h, Win32.HWND_TOPMOST, x, y, w, hgt, Win32.SWP_NOACTIVATE);
+        // Move first so the window takes on the target monitor's DPI, then size it in DIPs:
+        // sizing in pixels before the DPI change made Windows rescale it again.
+        Native.SetWindowPos(h, Win32.HWND_TOPMOST, x, y, 0, 0, Win32.SWP_NOACTIVATE | Win32.SWP_NOSIZE);
+        Width = dipW;
+        Height = dipH;
     }
 
     [DllImport("shcore.dll")] private static extern int GetDpiForMonitor(IntPtr mon, int type, out uint x, out uint y);
