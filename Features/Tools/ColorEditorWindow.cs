@@ -36,7 +36,8 @@ internal sealed class ColorEditorWindow : FluentWindow
         _picker = picker;
         _settings = settings;
         Title = "Color Picker";
-        Width = 420; Height = 640; MinWidth = 360; MinHeight = 420;
+        Width = 420; MinWidth = 360; MaxHeight = 820;
+        SizeToContent = SizeToContent.Height;   // no empty space below the formats; scrolls past MaxHeight
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         ExtendsContentIntoTitleBar = true;
         WindowBackdropType = WindowBackdropType.Mica;
