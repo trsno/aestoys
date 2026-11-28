@@ -72,7 +72,9 @@ internal sealed class LocksmithWindow : FluentWindow
         Wpf.Ui.Appearance.ApplicationThemeManager.ApplySystemTheme();
         Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this);
 
-        _paths.AddRange(paths.Where(p => !string.IsNullOrWhiteSpace(p)));
+        // Explorer passes drives as "C:\" which arrives as C:" (the backslash escapes the quote).
+        _paths.AddRange(paths.Select(p => p.Trim().TrimEnd('"')).Select(p => p.Length == 2 && p[1] == ':' ? p + "\\" : p)
+                             .Where(p => !string.IsNullOrWhiteSpace(p)));
 
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

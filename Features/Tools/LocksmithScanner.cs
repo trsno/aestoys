@@ -43,7 +43,7 @@ internal static class LocksmithScanner
     private const int STATUS_INFO_LENGTH_MISMATCH = unchecked((int)0xC0000004);
     private const uint PROCESS_DUP_HANDLE = 0x40, PROCESS_QUERY_LIMITED_INFORMATION = 0x1000, PROCESS_QUERY_INFORMATION = 0x400, PROCESS_VM_READ = 0x10;
     private const uint DUPLICATE_SAME_ACCESS = 2, FILE_TYPE_DISK = 1;
-    private const int EntrySize = 40; // SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX on x64
+    private const int EntrySize = 40; // SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX on x64: Object 0, Pid 8, Handle 16, Access 24, BackTrace 28, TypeIndex 30
 
     // ---------------------------------------------------------------- public
 
@@ -146,7 +146,7 @@ internal static class LocksmithScanner
                 {
                     IntPtr e = first + (int)(i * EntrySize);
                     int pid = (int)Marshal.ReadIntPtr(e, 8).ToInt64();
-                    int type = (ushort)Marshal.ReadInt16(e, 26);
+                    int type = (ushort)Marshal.ReadInt16(e, 30);
                     if (pid == me || (fileType >= 0 && type != fileType)) continue;
                     IntPtr value = Marshal.ReadIntPtr(e, 16);
 
@@ -181,7 +181,7 @@ internal static class LocksmithScanner
             {
                 IntPtr e = first + (int)(i * EntrySize);
                 if ((int)Marshal.ReadIntPtr(e, 8).ToInt64() == me && Marshal.ReadIntPtr(e, 16) == mine)
-                    return (ushort)Marshal.ReadInt16(e, 26);
+                    return (ushort)Marshal.ReadInt16(e, 30);
             }
         }
         catch { }
