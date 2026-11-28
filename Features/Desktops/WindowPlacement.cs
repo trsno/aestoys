@@ -20,6 +20,15 @@ internal sealed class WindowPlacement : IDisposable
     private readonly HashSet<IntPtr> _seen = new();
     private IntPtr _hook;
 
+    /// <summary>
+    /// Gets first say over a new window (FancyZones puts apps back in their last zone). Returns true
+    /// when it placed the window, which then isn't centred. Set before <see cref="ApplySettings"/>.
+    /// </summary>
+    internal static Func<IntPtr, bool>? NewWindowHandler;
+    internal static Func<bool>? NewWindowHandlerActive;
+
+    private bool Wanted => _settings.Placement.CenterNewWindows || NewWindowHandlerActive?.Invoke() == true;
+
     public WindowPlacement(AppSettings settings)
     {
         _settings = settings;
@@ -29,14 +38,14 @@ internal sealed class WindowPlacement : IDisposable
 
     public void ApplySettings()
     {
-        if (_settings.Placement.CenterNewWindows && _hook == IntPtr.Zero)
+        if (Wanted && _hook == IntPtr.Zero)
         {
             _seen.Clear();
             Native.EnumWindows((h, _) => { _seen.Add(h); return true; }, IntPtr.Zero); // existing windows aren't "new"
             // Out-of-context, all processes, skipping our own; delivered through this thread's message loop.
             _hook = Win32.SetWinEventHook(Win32.EVENT_OBJECT_DESTROY, Win32.EVENT_OBJECT_SHOW, IntPtr.Zero, _proc, 0, 0, Win32.WINEVENT_SKIPOWNPROCESS);
         }
-        else if (!_settings.Placement.CenterNewWindows) Unhook();
+        else if (!Wanted) Unhook();
     }
 
     private void OnEvent(IntPtr hook, uint evt, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
@@ -48,7 +57,12 @@ internal sealed class WindowPlacement : IDisposable
         // A window that appears while a mouse button is held is a drag (e.g. a Chrome tab torn off
         // into its own window). Moving it would break the drag.
         if ((Native.GetAsyncKeyState(0x01) & 0x8000) != 0 || (Native.GetAsyncKeyState(0x02) & 0x8000) != 0) return;
-        try { if (IsNewAppWindow(hwnd)) Center(hwnd); }
+        try
+        {
+            if (!IsNewAppWindow(hwnd)) return;
+            if (NewWindowHandler?.Invoke(hwnd) == true) return;
+            if (_settings.Placement.CenterNewWindows) Center(hwnd);
+        }
         catch (Exception e) { App.Log("center: " + e.Message); }
     }
 

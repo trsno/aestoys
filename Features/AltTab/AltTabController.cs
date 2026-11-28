@@ -25,6 +25,7 @@ internal sealed class AltTabController : IDisposable
 
     // Set on the hook thread, read on both; everything else runs on the UI thread.
     private volatile bool _active;
+    internal bool IsActive => _active;
 
     // Session state.
     private List<SwitchItem> _items = new();
