@@ -44,6 +44,7 @@ public partial class App : Application
     internal static Features.Tools.WindowTransparency? Glass { get; private set; }
     internal static Features.Tools.EyeRest? Eyes { get; private set; }
     private const string ClipboardEventName = @"Local\aestoys.clipboard";
+    private const string DemoTrayMenuEventName = @"Local\aestoys.demo-traymenu";
     private const string DemoZonesEventName = @"Local\aestoys.demo-zones";
     private const string DemoColorEventName = @"Local\aestoys.demo-colorpicker";
     private const string ColorEditorEventName = @"Local\aestoys.color-editor";
@@ -102,7 +103,8 @@ public partial class App : Application
             bool colorEditor = e.Args.Contains("--color-editor", StringComparer.OrdinalIgnoreCase);
             bool demoZones = e.Args.Contains("--demo-zones", StringComparer.OrdinalIgnoreCase);
             bool clipboard = e.Args.Contains("--clipboard", StringComparer.OrdinalIgnoreCase);
-            string evt = clipboard ? ClipboardEventName : demoZones ? DemoZonesEventName : colorEditor ? ColorEditorEventName : demoColor ? DemoColorEventName : demoLauncher ? DemoLauncherEventName : demoAll ? DemoAllEventName : demo ? DemoEventName : ShowEventName;
+            bool demoTray = e.Args.Contains("--demo-traymenu", StringComparer.OrdinalIgnoreCase);
+            string evt = demoTray ? DemoTrayMenuEventName : clipboard ? ClipboardEventName : demoZones ? DemoZonesEventName : colorEditor ? ColorEditorEventName : demoColor ? DemoColorEventName : demoLauncher ? DemoLauncherEventName : demoAll ? DemoAllEventName : demo ? DemoEventName : ShowEventName;
             try { EventWaitHandle.OpenExisting(evt).Set(); } catch { }
             _mutex = null;
             Shutdown();
@@ -211,6 +213,8 @@ public partial class App : Application
                 Dispatcher.BeginInvoke(() => ColorPick?.Demo(demoZoom++ % 2 == 0 ? 0 : 2));
         }) { IsBackground = true }.Start();
 
+        var trayDemoEvent = new EventWaitHandle(false, EventResetMode.AutoReset, DemoTrayMenuEventName);
+        new Thread(() => { while (trayDemoEvent.WaitOne()) Dispatcher.BeginInvoke(DemoTrayMenu); }) { IsBackground = true }.Start();
         var clipboardEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ClipboardEventName);
         new Thread(() =>
         {
@@ -250,21 +254,22 @@ public partial class App : Application
     private void CreateTray()
     {
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Settings", null, (_, _) => ShowSettings());
-        var awake = new Forms.ToolStripMenuItem("Keep awake");
+        menu.Items.Add(new Forms.ToolStripMenuItem("Settings", null, (_, _) => ShowSettings()).Icon(Interop.TrayMenuStyle.Settings));
+        var awake = new Forms.ToolStripMenuItem("Keep awake").Icon(Interop.TrayMenuStyle.Awake);
         menu.Items.Add(awake);
         menu.Opening += (_, _) => FillAwakeMenu(awake);
         FillAwakeMenu(awake);
-        var eyes = new Forms.ToolStripMenuItem("Eye rest reminders") { CheckOnClick = true };
+        var eyes = new Forms.ToolStripMenuItem("Eye rest reminders") { CheckOnClick = true, ShortcutKeyDisplayString = "\u2003\u2003" }.Icon(Interop.TrayMenuStyle.Eye);
         eyes.Click += (_, _) => { Settings.Tools.EyeRest.Enabled = eyes.Checked; Settings.Save(); ApplyFeatureSettings(); };
         menu.Items.Add(eyes);
         menu.Opening += (_, _) =>
         {
             eyes.Checked = Settings.Tools.EyeRest.Enabled;
-            eyes.Text = Eyes?.Next is DateTime next && Settings.Tools.EyeRest.Enabled ? $"Eye rest reminders (next at {next:t})" : "Eye rest reminders";
+            eyes.ToolTipText = Eyes?.Next is DateTime next && Settings.Tools.EyeRest.Enabled ? $"Next reminder at {next:t}" : "";
         };
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add("Exit", null, (_, _) => ExitApp());
+        menu.Items.Add(new Forms.ToolStripMenuItem("Exit", null, (_, _) => ExitApp()).Icon(Interop.TrayMenuStyle.Exit));
+        Interop.TrayMenuStyle.Apply(menu);
 
         _tray = new Forms.NotifyIcon
         {
@@ -274,6 +279,15 @@ public partial class App : Application
             Visible = true,
         };
         _tray.MouseClick += (_, a) => { if (a.Button == Forms.MouseButtons.Left) ShowSettings(); };
+    }
+
+    /// <summary>--demo-traymenu: opens the tray menu and its Keep awake submenu (for screenshots).</summary>
+    private void DemoTrayMenu()
+    {
+        if (_tray?.ContextMenuStrip is not { } menu) return;
+        var area = Forms.Screen.PrimaryScreen!.WorkingArea;
+        menu.Show(new System.Drawing.Point(area.Right - 420, area.Bottom - 10), Forms.ToolStripDropDownDirection.AboveRight);
+        if (menu.Items.Count > 1 && menu.Items[1] is Forms.ToolStripMenuItem awake) { awake.Select(); awake.ShowDropDown(); }
     }
 
     /// <summary>Keep awake submenu: the current state is checked, and picking a mode switches the feature on.</summary>

@@ -76,11 +76,11 @@ internal static class SettingsStyle
 
         switch (card)
         {
-            // A switch as the card's content: divider in front, and room where an expander has its arrow.
+            // A switch as the card's content: room where an expander has its arrow (the divider is for expanders only).
             case CardControl { Content: ToggleSwitch t } c:
                 c.Content = null;
                 t.Margin = new Thickness(0, 0, 30, 0);
-                c.Content = WithBar(t);
+                c.Content = t;   // no divider: there's no expand arrow to separate it from
                 break;
             // A switch in an expander's header grid.
             case CardExpander { Header: Grid g }:

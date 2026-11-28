@@ -239,7 +239,7 @@ public sealed class ToolsPage : Page
         var bar = new Border { Width = 1, Height = 28, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         bar.SetResourceReference(Border.BackgroundProperty, "DividerStrokeColorDefaultBrush");
         var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        right.Children.Add(bar);
+        if (fill is not null) right.Children.Add(bar);   // the divider separates the switch from an expand arrow only
         right.Children.Add(toggle);
         Grid.SetColumn(right, 1);
         header.Children.Add(right);
