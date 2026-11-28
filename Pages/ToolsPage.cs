@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Aestoys.Services;
 using Wpf.Ui.Controls;
 using TextBlock = System.Windows.Controls.TextBlock;
@@ -24,7 +25,10 @@ public sealed class ToolsPage : Page
     public ToolsPage()
     {
         Title = "Utilities";
-        Content = new ScrollViewer { Content = _root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var sv = new ScrollViewer { Content = _root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Content = sv;
+        // Scroll inside the page; without this the navigation host measures it at full height and nothing scrolls.
+        ScrollViewer.SetCanContentScroll(this, false);
         var title = new TextBlock { Text = "Utilities", FontSize = 28, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 6) };
         title.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
         _root.Children.Add(title);
@@ -32,9 +36,10 @@ public sealed class ToolsPage : Page
         if (T.PowerToysImported) from.Add("PowerToys");
         if (T.Clipboard.DittoImported) from.Add("Ditto");
         if (T.Transparency.Glass2kImported) from.Add("Glass2k");
+        if (T.EyeRest.EyeRestImported) from.Add("EyeRest");
         _root.Children.Add(Note(from.Count > 0
             ? $"Settings, layouts and history were imported from {(from.Count > 1 ? string.Join(", ", from.Take(from.Count - 1)) + " and " + from[^1] : from[0])}."
-            : "Run aestoys with --import-powertoys, --import-ditto or --import-glass2k once to bring over your old settings."));
+            : "Run aestoys with --import-powertoys, --import-ditto, --import-glass2k or --import-eyerest once to bring over your old settings."));
 
         Section("Windows");
         Tool(SymbolRegular.Pin24, "Always On Top", $"{T.AlwaysOnTop.Hotkey} pins the active window on top with a coloured frame; {T.AlwaysOnTop.IncreaseOpacity} and {T.AlwaysOnTop.DecreaseOpacity} change its opacity",
@@ -129,6 +134,14 @@ public sealed class ToolsPage : Page
                 body.Children.Add(Switch("Keep the screen on", () => T.Awake.KeepDisplayOn, v => T.Awake.KeepDisplayOn = v));
             });
 
+        Tool(SymbolRegular.Eye24, "Eye rest reminders", $"Every {T.EyeRest.IntervalMinutes} minutes, a reminder to look away from the screen for 20 seconds (also in the tray menu)",
+            () => T.EyeRest.Enabled, v => T.EyeRest.Enabled = v, body =>
+            {
+                body.Children.Add(Slider("Remind every", 1, 120, () => T.EyeRest.IntervalMinutes, v => T.EyeRest.IntervalMinutes = v, "min"));
+                body.Children.Add(Switch("Show the reminder", () => T.EyeRest.ShowMessage, v => T.EyeRest.ShowMessage = v));
+                body.Children.Add(Action("See what it looks like", "Test", () => App.Notify(Features.Tools.EyeRest.Title, Features.Tools.EyeRest.Message)));
+                body.Children.Add(Note("Nothing is shown while the PC is locked; unlocking starts the countdown again."));
+            });
         Loaded += (_, _) => _loading = false;
     }
 
@@ -139,6 +152,29 @@ public sealed class ToolsPage : Page
         var t = new TextBlock { Text = text, FontSize = 14, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 16, 0, 8) };
         t.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
         _root.Children.Add(t);
+        // One rounded panel per section, rows separated by thin lines (like phone settings).
+        _group = new StackPanel();
+        var panel = new Border { CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(1), Padding = new Thickness(0, 4, 0, 4), Child = _group, Margin = new Thickness(0, 0, 0, 8) };
+        panel.SetResourceReference(Border.BackgroundProperty, "CardBackgroundFillColorDefaultBrush");
+        panel.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush");
+        _root.Children.Add(panel);
+    }
+
+    private StackPanel? _group;
+
+    private void AddRow(Control card)
+    {
+        card.Background = System.Windows.Media.Brushes.Transparent;
+        card.BorderThickness = new Thickness(0);
+        card.Margin = new Thickness(0);
+        if (_group is null) { _root.Children.Add(card); return; }
+        if (_group.Children.Count > 0)
+        {
+            var line = new Border { Height = 1, Margin = new Thickness(56, 0, 16, 0) };
+            line.SetResourceReference(Border.BackgroundProperty, "DividerStrokeColorDefaultBrush");
+            _group.Children.Add(line);
+        }
+        _group.Children.Add(card);
     }
 
     private static TextBlock Note(string text)
@@ -161,21 +197,26 @@ public sealed class ToolsPage : Page
         text.Children.Add(n);
         text.Children.Add(d);
         header.Children.Add(text);
-        var toggle = new ToggleSwitch { IsChecked = get(), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, fill is null ? 0 : 12, 0) };
+        var toggle = new ToggleSwitch { IsChecked = get(), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, fill is null ? 30 : 12, 0) };   // rows without an arrow keep their switch in line
         toggle.Checked += (_, _) => Changed(() => set(true));
         toggle.Unchecked += (_, _) => Changed(() => set(false));
-        Grid.SetColumn(toggle, 1);
-        header.Children.Add(toggle);
+        var bar = new Border { Width = 1, Height = 28, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        bar.SetResourceReference(Border.BackgroundProperty, "DividerStrokeColorDefaultBrush");
+        var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        right.Children.Add(bar);
+        right.Children.Add(toggle);
+        Grid.SetColumn(right, 1);
+        header.Children.Add(right);
 
         if (fill is null)
         {
             var card = new CardControl { Icon = new SymbolIcon(icon), Header = header, Margin = new Thickness(0, 0, 0, 4) };
-            _root.Children.Add(card);
+            AddRow(card);
             return;
         }
         var body = new StackPanel { Margin = new Thickness(40, 0, 0, 0) };
         fill(body);
-        _root.Children.Add(new CardExpander { Icon = new SymbolIcon(icon), Header = header, Content = body, Margin = new Thickness(0, 0, 0, 4) });
+        AddRow(new CardExpander { Icon = new SymbolIcon(icon), Header = header, Content = body });
     }
 
     private void Changed(Action apply)

@@ -179,6 +179,14 @@ public sealed class WindowTransparencySettings
     public bool Glass2kImported { get; set; }
 }
 
+public sealed class EyeRestSettings
+{
+    public bool Enabled { get; set; } = false;
+    public int IntervalMinutes { get; set; } = 20;
+    public bool ShowMessage { get; set; } = true;
+    public bool EyeRestImported { get; set; }
+}
+
 public sealed class ToolsSettings
 {
     /// <summary>Set once the PowerToys settings have been imported (so it only happens once).</summary>
@@ -192,4 +200,5 @@ public sealed class ToolsSettings
     public FancyZonesSettings FancyZones { get; set; } = new();
     public ClipboardSettings Clipboard { get; set; } = new();
     public WindowTransparencySettings Transparency { get; set; } = new();
+    public EyeRestSettings EyeRest { get; set; } = new();
 }

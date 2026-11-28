@@ -42,6 +42,7 @@ public partial class App : Application
     internal static Features.Tools.FancyZones? Zones { get; private set; }
     internal static Features.Clipboard.ClipboardHistory? Clips { get; private set; }
     internal static Features.Tools.WindowTransparency? Glass { get; private set; }
+    internal static Features.Tools.EyeRest? Eyes { get; private set; }
     private const string ClipboardEventName = @"Local\aestoys.clipboard";
     private const string DemoZonesEventName = @"Local\aestoys.demo-zones";
     private const string DemoColorEventName = @"Local\aestoys.demo-colorpicker";
@@ -112,6 +113,11 @@ public partial class App : Application
             try { Log(Features.Tools.WindowTransparency.ImportGlass2k(Settings)); }
             catch (Exception ex) { Log("Glass2k import failed: " + ex); }
         }
+        if (e.Args.Contains("--import-eyerest", StringComparer.OrdinalIgnoreCase))
+        {
+            try { Log(Features.Tools.EyeRest.ImportEyeRest(Settings)); }
+            catch (Exception ex) { Log("EyeRest import failed: " + ex); }
+        }
 
         // "Run as administrator": hand over to an elevated copy. If UAC is declined, keep running normally.
         if (Settings.RunAsAdmin && !Elevation.IsElevated && !e.Args.Contains("--no-elevate", StringComparer.OrdinalIgnoreCase))
@@ -141,6 +147,7 @@ public partial class App : Application
             if (Hotkeys is not null) Zones = new Features.Tools.FancyZones(Settings, Hotkeys);
             if (Hotkeys is not null) Clips = new Features.Clipboard.ClipboardHistory(Settings, Hotkeys);
             if (Hotkeys is not null) Glass = new Features.Tools.WindowTransparency(Settings, Hotkeys);
+            Eyes = new Features.Tools.EyeRest(Settings);
         }
         catch (Exception ex) { Log("tools: " + ex); }
         ApplyFeatureSettings();
@@ -218,6 +225,12 @@ public partial class App : Application
             ShowSettings();
     }
 
+    /// <summary>A Windows notification from the tray icon.</summary>
+    internal static void Notify(string title, string text)
+    {
+        if (Current is App app && app._tray is { } tray) tray.ShowBalloonTip(10000, title, text, Forms.ToolTipIcon.None);
+    }
+
     private void CreateTray()
     {
         var menu = new Forms.ContextMenuStrip();
@@ -226,6 +239,14 @@ public partial class App : Application
         menu.Items.Add(awake);
         menu.Opening += (_, _) => FillAwakeMenu(awake);
         FillAwakeMenu(awake);
+        var eyes = new Forms.ToolStripMenuItem("Eye rest reminders") { CheckOnClick = true };
+        eyes.Click += (_, _) => { Settings.Tools.EyeRest.Enabled = eyes.Checked; Settings.Save(); ApplyFeatureSettings(); };
+        menu.Items.Add(eyes);
+        menu.Opening += (_, _) =>
+        {
+            eyes.Checked = Settings.Tools.EyeRest.Enabled;
+            eyes.Text = Eyes?.Next is DateTime next && Settings.Tools.EyeRest.Enabled ? $"Eye rest reminders (next at {next:t})" : "Eye rest reminders";
+        };
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApp());
 
@@ -291,6 +312,7 @@ public partial class App : Application
         Zones?.ApplySettings();
         Clips?.ApplySettings();
         Glass?.ApplySettings();
+        Eyes?.ApplySettings();
         Features.Tools.LocksmithMenu.Apply(Settings.Tools.Locksmith.Enabled, Settings.Tools.Locksmith.ExtendedMenuOnly);
     }
 
@@ -367,11 +389,12 @@ public partial class App : Application
         try { Zones?.Dispose(); } catch { }
         try { Clips?.Dispose(); } catch { }
         try { Glass?.Dispose(); } catch { }
+        try { Eyes?.Dispose(); } catch { }
         try { Awake?.Dispose(); } catch { }
         try { Mouse?.Dispose(); } catch { }
         try { Hook?.Dispose(); } catch { }
         AltTab = null; Desktops = null; Placement = null; Launcher = null; Hook = null;
-        OnTop = null; Awake = null; Mouse = null; Hotkeys = null; ColorPick = null; Crop = null; Zones = null; Grab = null; Clips = null; Glass = null;
+        OnTop = null; Awake = null; Mouse = null; Hotkeys = null; ColorPick = null; Crop = null; Zones = null; Grab = null; Clips = null; Glass = null; Eyes = null;
     }
 
     protected override void OnExit(ExitEventArgs e)
