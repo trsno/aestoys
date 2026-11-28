@@ -22,14 +22,14 @@ internal static class TrayMenuStyle
 
     // Layout in logical pixels.
     private const int Inset = 5;          // highlight and separator inset from the window edge
-    private const int IconCenter = 22;
-    private const int TextX = 45;
-    private const int ChevronCol = 30;    // chevron column at the right edge
-    private const int RightPad = 16;      // space after text/badge when there's no chevron
-    private const int RowHeight = 38;
-    private const int SeparatorHeight = 7;
-    private const int MinWidth = 160;
-    private const int SubmenuOverlap = 4;
+    private const int IconCenter = 19;
+    private const int TextX = 37;
+    private const int ChevronCol = 26;    // chevron column at the right edge
+    private const int RightPad = 10;      // space after text/badge when there's no chevron
+    private const int RowHeight = 32;
+    private const int SeparatorHeight = 5;
+    private const int MinWidth = 140;
+    private const int SubmenuOverlap = 3;
     private const string BadgeText = "On";
 
     [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
@@ -120,13 +120,13 @@ internal static class TrayMenuStyle
     private sealed class Renderer : ToolStripRenderer
     {
         public Color Back, Fore, Dim, Hover, Line, Border, Accent, BadgeFill;
-        public readonly Font Font = new("Segoe UI", 9.75f);
-        private readonly Font _badgeFont = new("Segoe UI", 9f);
+        public readonly Font Font = new("Segoe UI", 9f);
+        private readonly Font _badgeFont = new("Segoe UI", 8.25f);
         private static readonly string IconFont = FontExists("Segoe Fluent Icons") ? "Segoe Fluent Icons" : "Segoe MDL2 Assets";
 
         public Renderer() => Refresh();
 
-        public int BadgeWidth(Control c) => TextRenderer.MeasureText(BadgeText, _badgeFont).Width + c.LogicalToDeviceUnits(16);
+        public int BadgeWidth(Control c) => TextRenderer.MeasureText(BadgeText, _badgeFont).Width + c.LogicalToDeviceUnits(12);
 
         public void Refresh()
         {
@@ -163,17 +163,17 @@ internal static class TrayMenuStyle
 
             if ((item.Selected || item.DropDown.Visible && item.HasDropDownItems) && item.Enabled)
             {
-                using var path = RoundRect(new Rectangle(D(Inset), D(1), w - 2 * D(Inset), h - D(2)), D(5));
+                using var path = RoundRect(new Rectangle(D(Inset), D(1), w - 2 * D(Inset), h - D(2)), D(4));
                 using var brush = new SolidBrush(Hover);
                 g.FillPath(brush, path);
             }
 
             var color = item.Enabled ? Fore : Dim;
-            var iconBox = new Rectangle(D(IconCenter - 16), 0, D(32), h);
-            if (item.Tag is string glyph) Glyph(g, glyph, iconBox, color, 12f);
+            var iconBox = new Rectangle(D(IconCenter - 14), 0, D(28), h);
+            if (item.Tag is string glyph) Glyph(g, glyph, iconBox, color, 11f);
             else if (item.Checked)
             {
-                int dot = D(6);
+                int dot = D(5);
                 using var b = new SolidBrush(color);
                 g.FillEllipse(b, D(IconCenter) - dot / 2f, h / 2f - dot / 2f, dot, dot);
             }
@@ -181,16 +181,16 @@ internal static class TrayMenuStyle
             int right = w - D(Inset);
             if (item.HasDropDownItems)
             {
-                Glyph(g, Chevron, new Rectangle(w - D(ChevronCol), 0, D(ChevronCol - Inset - 6), h), Dim, 7.5f);
+                Glyph(g, Chevron, new Rectangle(w - D(ChevronCol), 0, D(ChevronCol - Inset - 4), h), Dim, 7f);
                 right = w - D(ChevronCol);
             }
-            else right = w - D(RightPad) + D(4);
+            else right = w - D(Inset) - D(2);
 
             if (Badge(item))
             {
-                int bw = BadgeWidth(o), bh = D(24);
-                var badge = new Rectangle(right - bw - D(4), (h - bh) / 2, bw, bh);
-                using (var path = RoundRect(badge, D(6)))
+                int bw = BadgeWidth(o), bh = D(20);
+                var badge = new Rectangle(right - bw - D(2), (h - bh) / 2, bw, bh);
+                using (var path = RoundRect(badge, D(5)))
                 {
                     using var fill = new SolidBrush(BadgeFill);
                     g.FillPath(fill, path);
