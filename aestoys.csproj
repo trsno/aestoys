@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -31,5 +31,23 @@
     <None Include="ThirdParty\VirtualDesktopAccessor\VirtualDesktopAccessor.dll" Link="VirtualDesktopAccessor.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The File Explorer add-ons are their own project. -->
+    <Compile Remove="ShellExt\**" />
+    <None Remove="ShellExt\**" />
+    <Page Remove="ShellExt\**" />
+  </ItemGroup>
+  <!-- File Explorer add-ons: built separately and published to shellext\<build time>\ so a new build
+       never has to overwrite DLLs that Windows' preview/thumbnail hosts still have loaded. -->
+  <Target Name="PublishShellExt" AfterTargets="Publish">
+    <MSBuild Projects="ShellExt\aestoys.ShellExt.csproj" Targets="Restore;Build" Properties="Configuration=Release;PublishSingleFile=false;RuntimeIdentifier=win-x64" />
+    <PropertyGroup>
+      <ShellExtStamp>$([System.DateTime]::Now.ToString(yyyyMMddHHmmss))</ShellExtStamp>
+    </PropertyGroup>
+    <ItemGroup>
+      <ShellExtFiles Include="ShellExt\bin\Release\net10.0-windows10.0.19041.0\win-x64\**\*" Exclude="ShellExt\bin\Release\net10.0-windows10.0.19041.0\win-x64\**\*.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ShellExtFiles)" DestinationFiles="@(ShellExtFiles->'$(PublishDir)shellext\$(ShellExtStamp)\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
 </Project>
 

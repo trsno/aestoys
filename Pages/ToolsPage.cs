@@ -155,6 +155,21 @@ public sealed class ToolsPage : Page
                 body.Children.Add(Switch("Keep the screen on", () => T.Awake.KeepDisplayOn, v => T.Awake.KeepDisplayOn = v));
             });
 
+        Tool(SymbolRegular.DocumentSearch24, "File Explorer add-ons", "Preview pane and thumbnails for SVG, Markdown, source code, PDF, G-code, STL and QOI files",
+            () => T.ExplorerAddons.Enabled, v => T.ExplorerAddons.Enabled = v, body =>
+            {
+                foreach (var a in Features.Tools.ExplorerAddons.All)
+                {
+                    var addon = a;
+                    body.Children.Add(Switch(addon.Name, () => T.ExplorerAddons.On.GetValueOrDefault(addon.Key, true), v => T.ExplorerAddons.On[addon.Key] = v));
+                }
+                var sizes = new[] { 11, 12, 13, 14, 16, 18, 20 };
+                body.Children.Add(Choice("Source code font size", sizes.Select(s => s + " px").ToArray(), () => Math.Max(0, Array.IndexOf(sizes, T.ExplorerAddons.CodeFontSize)), v => T.ExplorerAddons.CodeFontSize = sizes[v]));
+                body.Children.Add(Switch("Wrap long lines of code", () => T.ExplorerAddons.CodeWordWrap, v => T.ExplorerAddons.CodeWordWrap = v));
+                var colours = new[] { ("Yellow", "#FFC924"), ("Grey", "#B0B0B0"), ("Blue", "#4DA3FF"), ("Orange", "#FF8A3D"), ("Green", "#5BC85B") };
+                body.Children.Add(Choice("STL model colour", colours.Select(c => c.Item1).ToArray(), () => Math.Max(0, Array.FindIndex(colours, c => c.Item2.Equals(T.ExplorerAddons.StlColor, StringComparison.OrdinalIgnoreCase))), v => T.ExplorerAddons.StlColor = colours[v].Item2));
+                body.Children.Add(Note("They run in Windows' own preview and thumbnail hosts, not in File Explorer. Previews never load anything from the internet; links open in your browser. Thumbnails already cached by Windows update when the file changes."));
+            });
         Tool(SymbolRegular.Eye24, "Eye rest reminders", $"Every {T.EyeRest.IntervalMinutes} minutes, a reminder to look away from the screen for 20 seconds (also in the tray menu)",
             () => T.EyeRest.Enabled, v => T.EyeRest.Enabled = v, body =>
             {

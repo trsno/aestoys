@@ -329,6 +329,7 @@ public partial class App : Application
         Clips?.ApplySettings();
         Glass?.ApplySettings();
         Eyes?.ApplySettings();
+        try { Features.Tools.ExplorerAddons.Apply(Settings); } catch (Exception ex) { Log("explorer add-ons: " + ex.Message); }
         Features.Tools.LocksmithMenu.Apply(Settings.Tools.Locksmith.Enabled, Settings.Tools.Locksmith.ExtendedMenuOnly);
     }
 

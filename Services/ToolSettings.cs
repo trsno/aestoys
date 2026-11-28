@@ -187,6 +187,16 @@ public sealed class EyeRestSettings
     public bool EyeRestImported { get; set; }
 }
 
+public sealed class ExplorerAddonsSettings
+{
+    public bool Enabled { get; set; } = false;
+    /// <summary>Per add-on switch (ExplorerAddons.All keys); missing = on.</summary>
+    public Dictionary<string, bool> On { get; set; } = new();
+    public string StlColor { get; set; } = "#FFC924";
+    public bool CodeWordWrap { get; set; } = true;
+    public int CodeFontSize { get; set; } = 14;
+}
+
 public sealed class ToolsSettings
 {
     /// <summary>Set once the PowerToys settings have been imported (so it only happens once).</summary>
@@ -201,4 +211,5 @@ public sealed class ToolsSettings
     public ClipboardSettings Clipboard { get; set; } = new();
     public WindowTransparencySettings Transparency { get; set; } = new();
     public EyeRestSettings EyeRest { get; set; } = new();
+    public ExplorerAddonsSettings ExplorerAddons { get; set; } = new();
 }
