@@ -166,6 +166,8 @@ internal sealed class LocksmithWindow : FluentWindow
             ? "Nothing is using these files." + (Elevation.IsElevated ? "" : " (Apps running as administrator are only visible after Restart as administrator.)")
             : $"{processes.Count} process{(processes.Count == 1 ? "" : "es")} using these files";
         foreach (var p in processes) _list.Children.Add(Card(p));
+        if (_pendingNote is not null && processes.Count > 0) _status.Text = _pendingNote;
+        _pendingNote = null;
     }
 
     private UIElement Card(LockingProcess p)
@@ -202,11 +204,34 @@ internal sealed class LocksmithWindow : FluentWindow
         };
         endIcon.SetResourceReference(SymbolIcon.ForegroundProperty, "SystemFillColorCriticalBrush");
         endText.SetResourceReference(TextBlock.ForegroundProperty, "SystemFillColorCriticalBrush");
+        // Warning shown under the name when the polite close didn't work.
+        var note = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 0) };
+        note.SetResourceReference(TextBlock.ForegroundProperty, "SystemFillColorCautionBrush");
+        bool force = false;
+        System.Windows.Automation.AutomationProperties.SetName(end, "End task");
         end.Click += async (_, _) =>
         {
             end.IsEnabled = false;
-            await Task.Run(() => Kill(p.Pid));
-            Scan();
+            if (force)
+            {
+                await Task.Run(() => Kill(p.Pid));
+                Scan();
+                return;
+            }
+            endText.Text = "Closing…";
+            var outcome = await Task.Run(() => AskToClose(p.Pid));
+            if (outcome == CloseOutcome.Closed) { Scan(); return; }
+            // Still running: offer Force end as a separate, deliberate click.
+            force = true;
+            endText.Text = "Force end";
+            System.Windows.Automation.AutomationProperties.SetName(end, "Force end");
+            note.Text = (outcome == CloseOutcome.NoWindow
+                            ? "This app has no window to close."
+                            : "It didn't close. It may be asking to save; check its window first.")
+                        + " Force end closes it immediately and loses unsaved work."
+                        + (IsShell(p) ? " Ending Explorer also restarts the taskbar." : "");
+            note.Visibility = Visibility.Visible;
+            end.IsEnabled = true;
         };
 
         var header = new Grid();
@@ -222,6 +247,7 @@ internal sealed class LocksmithWindow : FluentWindow
         sub.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
         title.Children.Add(name);
         title.Children.Add(sub);
+        title.Children.Add(note);
         Grid.SetColumn(title, 1);
         header.Children.Add(title);
         Grid.SetColumn(end, 2);
@@ -251,14 +277,59 @@ internal sealed class LocksmithWindow : FluentWindow
         catch (Exception e) { App.Log($"locksmith: end {pid}: {e.Message}"); }
     }
 
+    private enum CloseOutcome { Closed, StillRunning, NoWindow }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool PostMessage(IntPtr hwnd, int msg, IntPtr w, IntPtr l);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc fn, IntPtr l);
+    private delegate bool EnumProc(IntPtr hwnd, IntPtr l);
+
+    // Closing these would close the taskbar/desktop or open the shut-down dialog.
+    private static readonly string[] ShellClasses = { "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "Progman", "WorkerW" };
+
+    private static bool IsShell(LockingProcess p) => p.Name.Equals("explorer", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Asks the app to close the way clicking its X does (WM_CLOSE to its visible top-level windows),
+    /// so it can offer to save. Waits up to 6 s for it to exit.
+    /// </summary>
+    private static CloseOutcome AskToClose(int pid)
+    {
+        var windows = new List<IntPtr>();
+        EnumWindows((h, _) =>
+        {
+            Aestoys.Interop.Native.GetWindowThreadProcessId(h, out uint owner);
+            if (owner == (uint)pid && Aestoys.Interop.Native.IsWindowVisible(h)
+                && Aestoys.Interop.Native.GetWindow(h, 4 /* GW_OWNER */) == IntPtr.Zero
+                && !ShellClasses.Contains(Aestoys.Interop.Win32.ClassName(h)))
+                windows.Add(h);
+            return true;
+        }, IntPtr.Zero);
+        if (windows.Count == 0) return CloseOutcome.NoWindow;
+        foreach (var h in windows) PostMessage(h, 0x0010 /* WM_CLOSE */, IntPtr.Zero, IntPtr.Zero);
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            if (p.WaitForExit(6000)) return CloseOutcome.Closed;
+            // Explorer keeps running after its folder windows close; that is enough to free the files.
+            if (windows.All(h => !Aestoys.Interop.Native.IsWindow(h))) return CloseOutcome.Closed;
+            return CloseOutcome.StillRunning;
+        }
+        catch { return CloseOutcome.Closed; }   // already gone
+    }
+
+    /// <summary>Politely closes every listed app at once, then rescans; whatever is left gets its own Force end button.</summary>
     private async Task EndAll()
     {
-        var pids = _list.Children.OfType<CardExpander>().Count();
-        if (pids == 0) return;
         var result = await LocksmithScannerSnapshot();
-        await Task.Run(() => { foreach (var p in result) Kill(p.Pid); });
+        if (result.Count == 0) { Scan(); return; }
+        _status.Text = $"Asking {result.Count} app{(result.Count == 1 ? "" : "s")} to close…";
+        var outcomes = await Task.WhenAll(result.Select(p => Task.Run(() => AskToClose(p.Pid))));
+        int left = outcomes.Count(o => o != CloseOutcome.Closed);
         Scan();
+        if (left > 0) _pendingNote = $"{left} app{(left == 1 ? "" : "s")} didn't close (no window, or waiting for you to save). Use End task on each to see the Force end option.";
     }
+
+    private string? _pendingNote;
 
     private Task<List<LockingProcess>> LocksmithScannerSnapshot()
     {

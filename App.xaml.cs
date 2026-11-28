@@ -32,6 +32,10 @@ public partial class App : Application
     internal static DesktopController? Desktops { get; private set; }
     internal static WindowPlacement? Placement { get; private set; }
     internal static StartLauncher? Launcher { get; private set; }
+    internal static HotkeyRouter? Hotkeys { get; private set; }
+    internal static MouseHook? Mouse { get; private set; }
+    internal static Features.Tools.Awake? Awake { get; private set; }
+    internal static Features.Tools.AlwaysOnTop? OnTop { get; private set; }
 
     private const string ExitEventName = @"Local\aestoys.exit";
 
@@ -96,9 +100,17 @@ public partial class App : Application
         {
             if (Hook is not null) Desktops = new DesktopController(Settings, Dispatcher, Hook);
             Placement = new WindowPlacement(Settings);
-            ApplyFeatureSettings();
         }
         catch (Exception ex) { Log("desktop features: " + ex); }
+        try
+        {
+            if (Hook is not null) Hotkeys = new HotkeyRouter(Hook, Dispatcher);
+            Mouse = new MouseHook();
+            Awake = new Features.Tools.Awake(Settings);
+            if (Hotkeys is not null) OnTop = new Features.Tools.AlwaysOnTop(Settings, Hotkeys);
+        }
+        catch (Exception ex) { Log("tools: " + ex); }
+        ApplyFeatureSettings();
         DesktopController.ExplorerRestarted += OnExplorerRestarted;
 
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
@@ -147,6 +159,10 @@ public partial class App : Application
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Settings", null, (_, _) => ShowSettings());
+        var awake = new Forms.ToolStripMenuItem("Keep awake");
+        menu.Items.Add(awake);
+        menu.Opening += (_, _) => FillAwakeMenu(awake);
+        FillAwakeMenu(awake);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApp());
 
@@ -158,6 +174,33 @@ public partial class App : Application
             Visible = true,
         };
         _tray.MouseClick += (_, a) => { if (a.Button == Forms.MouseButtons.Left) ShowSettings(); };
+    }
+
+    /// <summary>Keep awake submenu: the current state is checked, and picking a mode switches the feature on.</summary>
+    private static void FillAwakeMenu(Forms.ToolStripMenuItem root)
+    {
+        root.DropDownItems.Clear();
+        var s = Settings.Tools.Awake;
+        root.Visible = Awake is not null;
+        if (Awake is null) return;
+        root.Checked = Awake.Active;
+        void Item(string text, bool check, Action act)
+        {
+            var i = new Forms.ToolStripMenuItem(text) { Checked = check };
+            i.Click += (_, _) => { s.Enabled = true; act(); };
+            root.DropDownItems.Add(i);
+        }
+        if (Awake.Active) { var info = new Forms.ToolStripMenuItem(Awake.Describe()) { Enabled = false }; root.DropDownItems.Add(info); root.DropDownItems.Add(new Forms.ToolStripSeparator()); }
+        Item("Off", !Awake.Active, Awake.SetOff);
+        Item("Indefinitely", s.Enabled && s.Mode == AwakeMode.Indefinite, Awake.SetIndefinite);
+        Item("For 30 minutes", false, () => Awake.SetFor(TimeSpan.FromMinutes(30)));
+        Item("For 1 hour", false, () => Awake.SetFor(TimeSpan.FromHours(1)));
+        Item("For 2 hours", false, () => Awake.SetFor(TimeSpan.FromHours(2)));
+        Item("For 4 hours", false, () => Awake.SetFor(TimeSpan.FromHours(4)));
+        root.DropDownItems.Add(new Forms.ToolStripSeparator());
+        var display = new Forms.ToolStripMenuItem("Keep screen on") { Checked = s.KeepDisplayOn };
+        display.Click += (_, _) => Awake.SetKeepDisplayOn(!s.KeepDisplayOn);
+        root.DropDownItems.Add(display);
     }
 
     internal void ShowSettings()
@@ -180,6 +223,9 @@ public partial class App : Application
         Placement?.ApplySettings();
         if (Settings.Launcher.Enabled) { if (Launcher is null) Launcher = new StartLauncher(Settings); else Launcher.Reload(); }
         else { Launcher?.Dispose(); Launcher = null; }
+        Awake?.Apply();
+        OnTop?.ApplySettings();
+        Features.Tools.LocksmithMenu.Apply(Settings.Tools.Locksmith.Enabled, Settings.Tools.Locksmith.ExtendedMenuOnly);
     }
 
     private System.Windows.Threading.DispatcherTimer? _explorerTimer;
@@ -204,6 +250,8 @@ public partial class App : Application
         try { Placement?.Dispose(); } catch { }
         try { Desktops?.Dispose(); } catch { }
         try { Launcher?.Dispose(); } catch { }
+        try { OnTop?.Dispose(); } catch { }      // un-pin and restore opacity; the new copy starts clean
+        try { Mouse?.Dispose(); } catch { }
         try { Hook?.Dispose(); } catch { }
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); _tray = null; }
         try
@@ -247,8 +295,12 @@ public partial class App : Application
         try { Desktops?.Dispose(); } catch { }
         try { Placement?.Dispose(); } catch { }
         try { Launcher?.Dispose(); } catch { }
+        try { OnTop?.Dispose(); } catch { }
+        try { Awake?.Dispose(); } catch { }
+        try { Mouse?.Dispose(); } catch { }
         try { Hook?.Dispose(); } catch { }
         AltTab = null; Desktops = null; Placement = null; Launcher = null; Hook = null;
+        OnTop = null; Awake = null; Mouse = null; Hotkeys = null;
     }
 
     protected override void OnExit(ExitEventArgs e)
