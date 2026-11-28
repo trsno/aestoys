@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -15,6 +15,7 @@ public partial class DesktopsPage : Page
     public DesktopsPage()
     {
         InitializeComponent();
+        SettingsStyle.Apply(this);
         var s = App.Settings;
         WrapToggle.IsChecked = s.Desktops.WrapAround;
         MoveToggle.IsChecked = s.Desktops.MoveWindowKeys;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,6 +16,7 @@ public partial class AltTabPage : Page
     public AltTabPage()
     {
         InitializeComponent();
+        SettingsStyle.Apply(this);
         var s = App.Settings;
         EnabledToggle.IsChecked = s.AltTabPerMonitorEnabled;
         ModeCombo.SelectedIndex = s.MonitorMode == MonitorMode.Cursor ? 0 : 1;

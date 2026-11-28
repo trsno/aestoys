@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using Aestoys.Services;
@@ -13,6 +13,7 @@ public partial class GeneralPage : Page
     public GeneralPage()
     {
         InitializeComponent();
+        SettingsStyle.Apply(this);
         var s = App.Settings;
         StartupToggle.IsChecked = s.StartWithWindows;
         AdminToggle.IsChecked = s.RunAsAdmin;
