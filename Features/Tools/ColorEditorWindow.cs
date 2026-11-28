@@ -25,7 +25,7 @@ internal sealed class ColorEditorWindow : FluentWindow
     private readonly TextBlock _name = new() { FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 8) };
     private readonly StackPanel _formats = new();
     private readonly Slider[] _rgb = new Slider[3];
-    private readonly TextBlock _empty = new() { Text = "No colours yet. Pick one with Win+Shift+C or the button above.", TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock _empty = new() { Text = "No colours yet. Pick one with Win+Shift+C or the button above.", TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(0, 0, 0, 12) };
     private DColor _selected;
     private bool _updating;
 
@@ -54,6 +54,7 @@ internal sealed class ColorEditorWindow : FluentWindow
         pick.Click += (_, _) => _picker.StartPicking();
         body.Children.Add(pick);
         body.Children.Add(Caption("Recent"));
+        _empty.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorTertiaryBrush");
         body.Children.Add(_empty);
         body.Children.Add(_history);
         _swatch.SetResourceReference(Border.BorderBrushProperty, "ControlStrokeColorDefaultBrush");

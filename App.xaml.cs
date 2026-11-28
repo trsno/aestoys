@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Windows;
@@ -36,6 +36,9 @@ public partial class App : Application
     internal static MouseHook? Mouse { get; private set; }
     internal static Features.Tools.Awake? Awake { get; private set; }
     internal static Features.Tools.AlwaysOnTop? OnTop { get; private set; }
+    internal static Features.Tools.ColorPicker? ColorPick { get; private set; }
+    private const string DemoColorEventName = @"Local\aestoys.demo-colorpicker";
+    private const string ColorEditorEventName = @"Local\aestoys.color-editor";
 
     private const string ExitEventName = @"Local\aestoys.exit";
 
@@ -72,7 +75,9 @@ public partial class App : Application
             bool demoAll = e.Args.Contains("--demo-all", StringComparer.OrdinalIgnoreCase);
             bool demo = demoAll || e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
             bool demoLauncher = e.Args.Contains("--demo-launcher", StringComparer.OrdinalIgnoreCase);
-            string evt = demoLauncher ? DemoLauncherEventName : demoAll ? DemoAllEventName : demo ? DemoEventName : ShowEventName;
+            bool demoColor = e.Args.Contains("--demo-colorpicker", StringComparer.OrdinalIgnoreCase);
+            bool colorEditor = e.Args.Contains("--color-editor", StringComparer.OrdinalIgnoreCase);
+            string evt = colorEditor ? ColorEditorEventName : demoColor ? DemoColorEventName : demoLauncher ? DemoLauncherEventName : demoAll ? DemoAllEventName : demo ? DemoEventName : ShowEventName;
             try { EventWaitHandle.OpenExisting(evt).Set(); } catch { }
             _mutex = null;
             Shutdown();
@@ -108,6 +113,7 @@ public partial class App : Application
             Mouse = new MouseHook();
             Awake = new Features.Tools.Awake(Settings);
             if (Hotkeys is not null) OnTop = new Features.Tools.AlwaysOnTop(Settings, Hotkeys);
+            if (Hotkeys is not null && Hook is not null && Mouse is not null) ColorPick = new Features.Tools.ColorPicker(Settings, Hotkeys, Hook, Mouse);
         }
         catch (Exception ex) { Log("tools: " + ex); }
         ApplyFeatureSettings();
@@ -145,6 +151,21 @@ public partial class App : Application
         {
             while (demoLauncherEvent.WaitOne())
                 Dispatcher.BeginInvoke(() => Launcher?.Demo(4));
+        }) { IsBackground = true }.Start();
+
+        var demoColorEvent = new EventWaitHandle(false, EventResetMode.AutoReset, DemoColorEventName);
+        int demoZoom = 0;
+        new Thread(() =>
+        {
+            while (demoColorEvent.WaitOne())
+                Dispatcher.BeginInvoke(() => ColorPick?.Demo(demoZoom++ % 2 == 0 ? 0 : 2));
+        }) { IsBackground = true }.Start();
+
+        var colorEditorEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ColorEditorEventName);
+        new Thread(() =>
+        {
+            while (colorEditorEvent.WaitOne())
+                Dispatcher.BeginInvoke(() => ColorPick?.OpenEditor());
         }) { IsBackground = true }.Start();
 
         CreateTray();
@@ -296,11 +317,12 @@ public partial class App : Application
         try { Placement?.Dispose(); } catch { }
         try { Launcher?.Dispose(); } catch { }
         try { OnTop?.Dispose(); } catch { }
+        try { ColorPick?.Dispose(); } catch { }
         try { Awake?.Dispose(); } catch { }
         try { Mouse?.Dispose(); } catch { }
         try { Hook?.Dispose(); } catch { }
         AltTab = null; Desktops = null; Placement = null; Launcher = null; Hook = null;
-        OnTop = null; Awake = null; Mouse = null; Hotkeys = null;
+        OnTop = null; Awake = null; Mouse = null; Hotkeys = null; ColorPick = null;
     }
 
     protected override void OnExit(ExitEventArgs e)
