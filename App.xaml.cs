@@ -312,7 +312,7 @@ public partial class App : Application
         Item("For 2 hours", false, () => Awake.SetFor(TimeSpan.FromHours(2)));
         Item("For 4 hours", false, () => Awake.SetFor(TimeSpan.FromHours(4)));
         root.DropDownItems.Add(new Forms.ToolStripSeparator());
-        var display = new Forms.ToolStripMenuItem("Keep screen on") { Checked = s.KeepDisplayOn };
+        var display = new Forms.ToolStripMenuItem("Keep screen on") { Checked = s.KeepDisplayOn }.Icon(Interop.TrayMenuStyle.Screen);
         display.Click += (_, _) => Awake.SetKeepDisplayOn(!s.KeepDisplayOn);
         root.DropDownItems.Add(display);
     }
