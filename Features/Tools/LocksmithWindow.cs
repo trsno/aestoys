@@ -27,7 +27,7 @@ internal sealed class LocksmithWindow : FluentWindow
 
     private static Mutex? _mutex;
     private readonly List<string> _paths = new();
-    private readonly StackPanel _list = new();
+    private readonly StackPanel _list = new() { Margin = new Thickness(0, 0, 14, 0) };   // room for the scrollbar
     private readonly TextBlock _status = new() { Margin = new Thickness(0, 0, 0, 8), TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _targets = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12, Margin = new Thickness(0, 0, 0, 12) };
     private CancellationTokenSource? _scan;
@@ -186,7 +186,22 @@ internal sealed class LocksmithWindow : FluentWindow
             files.Children.Add(exe);
         }
 
-        var end = new Button { Content = "End task", Appearance = ControlAppearance.Danger };
+        // A quiet button with red text, rather than a solid red block next to every row.
+        var endIcon = new SymbolIcon(SymbolRegular.Dismiss16) { FontSize = 12 };
+        var endText = new TextBlock { Text = "End task", Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        var endContent = new StackPanel { Orientation = Orientation.Horizontal };
+        endContent.Children.Add(endIcon);
+        endContent.Children.Add(endText);
+        var end = new Button
+        {
+            Content = endContent,
+            Appearance = ControlAppearance.Secondary,
+            Padding = new Thickness(12, 5, 12, 6),
+            Margin = new Thickness(12, 0, 12, 0),
+            MinWidth = 0,
+        };
+        endIcon.SetResourceReference(SymbolIcon.ForegroundProperty, "SystemFillColorCriticalBrush");
+        endText.SetResourceReference(TextBlock.ForegroundProperty, "SystemFillColorCriticalBrush");
         end.Click += async (_, _) =>
         {
             end.IsEnabled = false;
@@ -213,7 +228,7 @@ internal sealed class LocksmithWindow : FluentWindow
         end.VerticalAlignment = VerticalAlignment.Center;
         header.Children.Add(end);
 
-        return new CardExpander { Header = header, Content = files, Margin = new Thickness(0, 0, 0, 4), IsExpanded = false };
+        return new CardExpander { Header = header, Content = files, Margin = new Thickness(0, 0, 0, 6), Padding = new Thickness(16, 10, 12, 10), IsExpanded = false };
     }
 
     private static ImageSource? IconOf(string? exe)
