@@ -56,7 +56,6 @@ internal static class TrayMenuStyle
         menu.ShowImageMargin = false;
         menu.Font = r.Font;
         menu.BackColor = r.Back;
-        menu.Padding = new Padding(0, D(4), 0, D(4));
         if (menu.Tag is not true)
         {
             menu.Tag = true;
@@ -76,13 +75,21 @@ internal static class TrayMenuStyle
             width = Math.Max(width, w + D(Inset));
         }
 
+        // Same gap above/below the rows as beside the highlight. A drop-down ignores Padding (it keeps
+        // its own couple of pixels), so the first and last rows get the rest as extra height.
+        int pad = D(Inset - 1);   // the highlight sits 1px inside its row
         int height = menu.Padding.Vertical;
+        ToolStripItem? first = null, last = null;
+        foreach (ToolStripItem item in menu.Items) if (item.Available) { first ??= item; last = item; }
+        Extra.Clear(menu.Items);
         foreach (ToolStripItem item in menu.Items)
         {
             item.AutoSize = false;
             item.Margin = Padding.Empty;
             item.Padding = Padding.Empty;
-            item.Size = new Size(width, D(item is ToolStripSeparator ? SeparatorHeight : RowHeight));
+            int top = item == first ? Math.Max(0, pad - menu.Padding.Top) : 0, bottom = item == last ? Math.Max(0, pad - menu.Padding.Bottom) : 0;
+            if (top + bottom > 0) Extra.Set(item, top, bottom);
+            item.Size = new Size(width, D(item is ToolStripSeparator ? SeparatorHeight : RowHeight) + top + bottom);
             if (item.Available) height += item.Height;   // Available = will be shown (Visible is false while the menu is closed)
             if (item is ToolStripMenuItem { HasDropDownItems: true } sub && sub.DropDown is ToolStripDropDownMenu dd)
             {
@@ -97,6 +104,15 @@ internal static class TrayMenuStyle
         // The menu would size itself from its own text measurement and cut the rows short.
         menu.AutoSize = false;
         menu.Size = new Size(width, height);
+    }
+
+    /// <summary>Extra space above/below a row (first and last rows only).</summary>
+    private static class Extra
+    {
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ToolStripItem, int[]> Map = new();
+        public static void Set(ToolStripItem i, int top, int bottom) => Map.AddOrUpdate(i, new[] { top, bottom });
+        public static void Clear(ToolStripItemCollection items) { foreach (ToolStripItem i in items) Map.Remove(i); }
+        public static (int Top, int Bottom) Of(ToolStripItem i) => Map.TryGetValue(i, out var v) ? (v[0], v[1]) : (0, 0);
     }
 
     /// <summary>Submenus overlap their parent a little, and their first row lines up with the parent row.</summary>
@@ -158,7 +174,10 @@ internal static class TrayMenuStyle
             if (e.Item is not ToolStripMenuItem item || item.Owner is not { } o) return;
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            int w = Math.Min(item.Width, o.ClientSize.Width - item.Bounds.X), h = item.Height;
+            int w = Math.Min(item.Width, o.ClientSize.Width - item.Bounds.X);
+            var (extraTop, extraBottom) = Extra.Of(item);
+            int h = item.Height - extraTop - extraBottom;
+            g.TranslateTransform(0, extraTop);
             int D(int v) => o.LogicalToDeviceUnits(v);
 
             if ((item.Selected || item.DropDown.Visible && item.HasDropDownItems) && item.Enabled)
@@ -197,13 +216,14 @@ internal static class TrayMenuStyle
                     using var pen = new Pen(Accent, Math.Max(1, D(1)));
                     g.DrawPath(pen, path);
                 }
-                TextRenderer.DrawText(g, BadgeText, _badgeFont, badge, Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+                TextRenderer.DrawText(g, BadgeText, _badgeFont, badge, Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding | TextFormatFlags.PreserveGraphicsTranslateTransform);
                 right = badge.X - D(6);
             }
 
             var text = new Rectangle(D(TextX), 0, Math.Max(0, right - D(TextX)), h);
             TextRenderer.DrawText(g, item.Text, item.Font, text, color,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.HidePrefix | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.HidePrefix | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.PreserveGraphicsTranslateTransform);
+            g.TranslateTransform(0, -extraTop);
         }
 
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
