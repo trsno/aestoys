@@ -94,7 +94,7 @@ public sealed class ToolsPage : Page
                         UIElement row = null!;
                         row = Action($"{name}  ·  level {rule.Value}  ({100 * Features.Tools.WindowTransparency.Alpha(rule.Value) / 255}% visible)", "Forget", () =>
                         {
-                            Changed(() => T.Transparency.Rules.Remove(rule.Key));
+                            Changed(() => { if (App.Glass is { } g) g.Forget(rule.Key); else T.Transparency.Rules.Remove(rule.Key); });
                             ((Panel)((FrameworkElement)row).Parent).Children.Remove(row);
                         });
                         body.Children.Add(row);
@@ -106,7 +106,28 @@ public sealed class ToolsPage : Page
             () => T.Clipboard.Enabled, v => T.Clipboard.Enabled = v, body =>
             {
                 body.Children.Add(Action("Your saved clips", "Open", () => App.Clips?.Show()));
-                body.Children.Add(Slider("Clips to keep (pinned ones are always kept)", 100, 5000, () => T.Clipboard.MaxEntries, v => T.Clipboard.MaxEntries = v, ""));
+                var sizes = new[] { 500, 1000, 1500, 2000, 3000, 5000, 10000 };
+                if (!sizes.Contains(T.Clipboard.MaxEntries)) sizes = sizes.Append(T.Clipboard.MaxEntries).Order().ToArray();
+                var keep = new ComboBox { MinWidth = 200, VerticalAlignment = VerticalAlignment.Center };
+                foreach (var s in sizes) keep.Items.Add(s.ToString("N0"));
+                keep.SelectedIndex = Array.IndexOf(sizes, T.Clipboard.MaxEntries);
+                bool reverting = false;
+                keep.SelectionChanged += (_, _) =>
+                {
+                    if (reverting || keep.SelectedIndex < 0) return;
+                    int v = keep.SelectedIndex, count = App.Clips?.Store.Count() ?? 0;
+                    if (sizes[v] < count && System.Windows.MessageBox.Show(
+                            $"You have {count:N0} clips. Keeping {sizes[v]:N0} deletes the oldest {count - sizes[v]:N0} the next time you copy something. Continue?",
+                            "Clipboard history", System.Windows.MessageBoxButton.OKCancel, System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.OK)
+                    {
+                        reverting = true;
+                        keep.SelectedIndex = Array.IndexOf(sizes, T.Clipboard.MaxEntries);
+                        reverting = false;
+                        return;
+                    }
+                    Changed(() => T.Clipboard.MaxEntries = sizes[v]);
+                };
+                body.Children.Add(Row("Clips to keep (pinned ones are always kept)", keep));
                 body.Children.Add(Note("Copies that password managers mark as private aren't saved."));
             });
 

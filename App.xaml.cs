@@ -64,6 +64,14 @@ public partial class App : Application
             return;
         }
 
+        // --launcher-icons: short-lived helper that does the launcher's shell work (see StartLauncher).
+        if (e.Args.Contains("--launcher-icons", StringComparer.OrdinalIgnoreCase))
+        {
+            try { Features.Desktops.StartLauncher.RunIconHelper(e.Args); } catch (Exception ex) { Log("icon helper: " + ex.Message); }
+            Shutdown();
+            return;
+        }
+
         // --exit: ask the running copy to quit cleanly (undoing what it changed on other windows).
         if (e.Args.Contains("--exit", StringComparer.OrdinalIgnoreCase))
         {
@@ -77,6 +85,13 @@ public partial class App : Application
         bool owned;
         try { owned = _mutex.WaitOne(waitForPrevious ? 15000 : 0); }
         catch (AbandonedMutexException) { owned = true; }
+        if (!owned && !OtherInstanceAlive())
+        {
+            // The owner has exited but is stuck in the kernel (it can't be killed and never releases
+            // the mutex until reboot). Don't let that block aestoys from starting.
+            Log("previous aestoys has exited but is stuck; starting anyway");
+            owned = true;
+        }
         if (!owned)
         {
             // Already running: ask that instance to show its settings window.
@@ -175,6 +190,7 @@ public partial class App : Application
         }) { IsBackground = true }.Start();
 
         var exitEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ExitEventName);
+        exitEvent.Reset();   // drop a request left over from before this copy started
         new Thread(() =>
         {
             if (exitEvent.WaitOne()) Dispatcher.BeginInvoke(ExitApp);
@@ -368,6 +384,22 @@ public partial class App : Application
         _mutex = null;
         ExitApp();
         return true;
+    }
+
+    private static bool OtherInstanceAlive()
+    {
+        int self = Environment.ProcessId;
+        foreach (var p in System.Diagnostics.Process.GetProcessesByName("aestoys"))
+        {
+            try
+            {
+                if (p.Id == self || p.HasExited) continue;
+                return true;
+            }
+            catch { return true; }   // can't inspect it (e.g. elevated): assume it's real
+            finally { p.Dispose(); }
+        }
+        return false;
     }
 
     internal void ExitApp()

@@ -80,7 +80,7 @@ internal sealed class StartLauncher : IDisposable
             {
                 _folderStamp = Directory.GetLastWriteTimeUtc(s.Folder);
                 foreach (var f in Directory.GetFiles(s.Folder, "*.lnk").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
-                    items.Add(new Item(f, null, LnkIconSource(f)));
+                    items.Add(new Item(f, null, f));   // the icon helper resolves the .lnk; no shell COM in this process
             }
         }
         catch (Exception e) { App.Log("launcher: " + e.Message); }
@@ -91,10 +91,96 @@ internal sealed class StartLauncher : IDisposable
     private void LoadIcons(int px)
     {
         foreach (var b in _icons) b?.Dispose();
-        _icons = _items.Select(i => ShellIcon(i.IconSource, px)).ToList();
+        _icons = LoadCachedIcons(_items.Select(i => i.IconSource).ToList(), px);
         _iconPx = px;
     }
 
+    // ---------------------------------------------------------------- icon helper process
+    //
+    // Reading .lnk files and asking the shell for icons loads shell extensions into the process
+    // (here: Nilesoft Shell). With those loaded, aestoys could not finish exiting: a thread stayed
+    // stuck in the kernel, the process lingered and kept holding the single-instance mutex. So the
+    // shell work runs in a short-lived "aestoys --launcher-icons" copy that writes PNGs to a cache;
+    // later starts reuse the cache and don't need the helper at all.
+
+    private static string CacheDir(IReadOnlyList<string> sources, int px)
+    {
+        var key = new StringBuilder().Append(px);
+        foreach (var s in sources)
+        {
+            key.Append('|').Append(s);
+            try { if (File.Exists(s)) key.Append('@').Append(File.GetLastWriteTimeUtc(s).Ticks); } catch { }
+        }
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(Encoding.UTF8.GetBytes(key.ToString())))[..16];
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "aestoys", "launcher-icons", hash);
+    }
+
+    private static List<Bitmap?> LoadCachedIcons(IReadOnlyList<string> sources, int px)
+    {
+        string dir = CacheDir(sources, px);
+        if (!File.Exists(Path.Combine(dir, "done")))
+        {
+            try
+            {
+                var psi = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true };
+                psi.ArgumentList.Add("--launcher-icons");
+                psi.ArgumentList.Add(dir);
+                psi.ArgumentList.Add(px.ToString());
+                foreach (var s in sources) psi.ArgumentList.Add(s);
+                using var helper = Process.Start(psi);
+                if (helper is not null && !helper.WaitForExit(8000)) App.Log("launcher: icon helper is slow; icons will appear next time");
+            }
+            catch (Exception e) { App.Log("launcher icons: " + e.Message); }
+            PruneCache(dir);
+        }
+        var icons = new List<Bitmap?>();
+        for (int i = 0; i < sources.Count; i++)
+        {
+            string f = Path.Combine(dir, i + ".png");
+            try
+            {
+                if (!File.Exists(f)) { icons.Add(null); continue; }
+                using var fs = File.OpenRead(f);
+                using var loaded = new Bitmap(fs);
+                icons.Add(new Bitmap(loaded));   // copy, so the file isn't kept open
+            }
+            catch { icons.Add(null); }
+        }
+        return icons;
+    }
+
+    /// <summary>Keeps the newest few cache folders (one per icon size / shortcut set).</summary>
+    private static void PruneCache(string keep)
+    {
+        try
+        {
+            var root = Path.GetDirectoryName(keep)!;
+            foreach (var d in new DirectoryInfo(root).GetDirectories().OrderByDescending(d => d.LastWriteTimeUtc).Skip(4))
+                if (!string.Equals(d.FullName, keep, StringComparison.OrdinalIgnoreCase)) d.Delete(true);
+        }
+        catch { }
+    }
+
+    /// <summary>"aestoys --launcher-icons dir px source…": render each source's icon to dir\N.png.</summary>
+    public static void RunIconHelper(string[] args)
+    {
+        int at = Array.FindIndex(args, a => a.Equals("--launcher-icons", StringComparison.OrdinalIgnoreCase));
+        if (at < 0 || at + 2 >= args.Length || !int.TryParse(args[at + 2], out int px)) return;
+        string dir = args[at + 1];
+        Directory.CreateDirectory(dir);
+        var sources = args.Skip(at + 3).ToList();
+        for (int i = 0; i < sources.Count; i++)
+        {
+            try
+            {
+                string src = sources[i].EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) ? LnkIconSource(sources[i]) : sources[i];
+                using var bmp = ShellIcon(src, px);
+                bmp?.Save(Path.Combine(dir, i + ".png"), ImageFormat.Png);
+            }
+            catch { }
+        }
+        File.WriteAllText(Path.Combine(dir, "done"), "");
+    }
     /// <summary>
     /// Where to take a shortcut's icon from. If the shortcut's icon (or else its target) is a program,
     /// use the program directly: Windows' icon cache can hold a broken entry for the .lnk itself.
@@ -230,8 +316,6 @@ internal sealed class StartLauncher : IDisposable
         catch { }
         if (_items.Count == 0) return;
         if (_iconPx != g.Icon) LoadIcons(g.Icon);    // first time, or scaling changed
-        else for (int i = 0; i < _items.Count; i++)  // retry any icon the shell failed to give us
-                _icons[i] ??= ShellIcon(_items[i].IconSource, g.Icon);
 
         // Match the taskbar's colour: sample an empty pixel at the Start button's top-left corner.
         IntPtr hdc = Win32.GetDC(IntPtr.Zero);

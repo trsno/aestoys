@@ -39,6 +39,18 @@ internal sealed class ClipboardStore : IDisposable
             CREATE INDEX IF NOT EXISTS Main_ClipOrder on Main(clipOrder DESC);
             CREATE INDEX IF NOT EXISTS Data_ParentId_Format ON Data(lParentID COLLATE BINARY ASC, strClipBoardFormat COLLATE NOCASE ASC);
             """);
+        // Ditto's delete triggers log every deleted clip to MainDeletes for its sync feature; nothing here
+        // reads that table, so it would only grow. (Data rows are deleted explicitly by Delete/Trim.)
+        Exec("DROP TRIGGER IF EXISTS delete_data_trigger; DROP TRIGGER IF EXISTS MainDeletes_delete_data_trigger;");
+        if (TableExists("MainDeletes")) Exec("DELETE FROM MainDeletes;");
+    }
+
+    private bool TableExists(string name)
+    {
+        using var c = _db.CreateCommand();
+        c.CommandText = "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = $n";
+        c.Parameters.AddWithValue("$n", name);
+        return Convert.ToInt32(c.ExecuteScalar()) > 0;
     }
 
     private void Exec(string sql)

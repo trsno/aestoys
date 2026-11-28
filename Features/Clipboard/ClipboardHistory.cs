@@ -153,6 +153,17 @@ internal sealed class ClipboardHistory : IDisposable
         finally { GlobalUnlock(h); }
     }
 
+    [DllImport("kernel32.dll")] private static extern uint GetACP();
+
+    /// <summary>The Windows ANSI code page (Encoding.Default is UTF-8 on .NET, which garbles CF_TEXT).</summary>
+    private static readonly Encoding Ansi = CreateAnsi();
+
+    private static Encoding CreateAnsi()
+    {
+        try { Encoding.RegisterProvider(CodePagesEncodingProvider.Instance); return Encoding.GetEncoding((int)GetACP()); }
+        catch { return Encoding.Latin1; }
+    }
+
     /// <summary>The text Ditto shows and searches: the text itself, the file paths, or the format name.</summary>
     internal static string Describe(IReadOnlyList<ClipFormat> formats)
     {
@@ -161,7 +172,7 @@ internal sealed class ClipboardHistory : IDisposable
         if (formats.FirstOrDefault(f => f.Name == "CF_HDROP") is { } d)
             return string.Join(Environment.NewLine, Files(d.Data));
         if (formats.FirstOrDefault(f => f.Name == "CF_TEXT") is { } t)
-            return Encoding.Default.GetString(t.Data).TrimEnd('\0');
+            return Ansi.GetString(t.Data).TrimEnd('\0');
         return formats[0].Name;
     }
 
@@ -172,7 +183,7 @@ internal sealed class ClipboardHistory : IDisposable
         if (dropfiles.Length < 20) return list;
         int offset = BitConverter.ToInt32(dropfiles, 0);
         bool wide = BitConverter.ToInt32(dropfiles, 16) != 0;
-        var enc = wide ? Encoding.Unicode : Encoding.Default;
+        var enc = wide ? Encoding.Unicode : Ansi;
         string all = enc.GetString(dropfiles, offset, dropfiles.Length - offset);
         foreach (var s in all.Split('\0')) if (s.Length > 0) list.Add(s);
         return list;
@@ -208,7 +219,18 @@ internal sealed class ClipboardHistory : IDisposable
             Native.SetForegroundWindow(target);
         }
         // Give the target a moment to take focus, then Ctrl+V (tagged so our own hooks ignore it).
-        Task.Delay(60).ContinueWith(_ => Native.SendKeys((Native.VK_CONTROL, false), (0x56, false), (0x56, true), (Native.VK_CONTROL, true)));
+        // Release any modifier still held (Shift from Shift+Enter, Win/Alt) so the app sees plain Ctrl+V,
+        // not Ctrl+Shift+V, which means something else in many apps.
+        Task.Delay(60).ContinueWith(_ =>
+        {
+            var keys = new List<(ushort, bool)>();
+            foreach (ushort vk in new ushort[] { 0xA0, 0xA1, 0xA4, 0xA5, Native.VK_LWIN, Native.VK_RWIN })   // L/R Shift, L/R Alt, Win
+                if ((Native.GetAsyncKeyState(vk) & 0x8000) != 0) keys.Add((vk, true));
+            if (keys.Any(k => k.Item1 is 0xA4 or 0xA5 or Native.VK_LWIN or Native.VK_RWIN)) keys.Insert(0, (Native.VK_DUMMY, false)); // keep Start/menus from opening
+            if (keys.Count > 0 && keys[0].Item1 == Native.VK_DUMMY) keys.Add((Native.VK_DUMMY, true));
+            keys.AddRange(new (ushort, bool)[] { (Native.VK_CONTROL, false), (0x56, false), (0x56, true), (Native.VK_CONTROL, true) });
+            Native.SendKeys(keys.ToArray());
+        });
     }
 
     private bool SetClipboard(IReadOnlyList<ClipFormat> formats)
@@ -243,7 +265,7 @@ internal sealed class ClipboardHistory : IDisposable
     public void Dispose()
     {
         if (_listening) RemoveClipboardFormatListener(_window.Handle);
-        _quick?.Close();
+        _quick?.CloseForGood();
         _window.Dispose();
         Store.Dispose();
     }

@@ -48,6 +48,7 @@ internal sealed class MouseHook : IDisposable
             _hook = IntPtr.Zero;
         })
         { IsBackground = true, Name = "aestoys mouse hook", Priority = ThreadPriority.Highest };
+        _thread.IsBackground = true;   // never keep the process alive on exit
         _thread.Start();
         ready.Wait();
         if (_hook == IntPtr.Zero) throw new InvalidOperationException($"SetWindowsHookEx (mouse) failed: {error}");

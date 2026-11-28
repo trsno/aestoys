@@ -22,7 +22,7 @@ using MenuItem = System.Windows.Controls.MenuItem;
 namespace Aestoys.Features.Clipboard;
 
 /// <summary>One row of the list. The thumbnail is decoded only when the row is on screen.</summary>
-internal sealed class ClipItem
+internal sealed class ClipItem : INotifyPropertyChanged
 {
     private readonly ClipboardStore _store;
     private ImageSource? _thumb;
@@ -57,10 +57,22 @@ internal sealed class ClipItem
         {
             if (_thumbTried || !Row.IsImage) return _thumb;
             _thumbTried = true;
-            try { _thumb = Decode(_store.Format(Row.Id, "PNG", "CF_DIB"), 80); } catch { }
-            return _thumb;
+            // Images are often several MB (DIBs); read and decode them off the UI thread, keep only the small result.
+            long id = Row.Id;
+            var store = _store;
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try { return Decode(store.Format(id, "PNG", "CF_DIB"), 80); } catch { return null; }
+            }).ContinueWith(task =>
+            {
+                _thumb = task.Result;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Thumb)));
+            }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
+            return null;
         }
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     internal static ImageSource? Decode(byte[]? data, int height)
     {
@@ -168,7 +180,7 @@ internal sealed class QuickPasteWindow : FluentWindow
         _search.TextChanged += (_, _) => { _searchDelay.Stop(); _searchDelay.Start(); };
         PreviewKeyDown += OnKey;
         Deactivated += (_, _) => Hide();
-        Closing += (_, e) => { e.Cancel = true; Hide(); };   // kept around for instant reopening
+        Closing += (_, e) => { if (!_reallyClose) { e.Cancel = true; Hide(); } };   // kept around for instant reopening
         // Remember the size only when the user resizes it (WM_EXITSIZEMOVE); DPI moves don't count.
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook((IntPtr h, int msg, IntPtr w, IntPtr l, ref bool handled) =>
         {
@@ -196,18 +208,27 @@ internal sealed class QuickPasteWindow : FluentWindow
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="{Binding Number}" FontSize="11" Opacity="0.55" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Number, Mode=OneTime}" FontSize="11" Opacity="0.55" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1">
-                    <Image Source="{Binding Thumb}" Visibility="{Binding ImageVisibility}" Height="40" MaxWidth="200" HorizontalAlignment="Left" Stretch="Uniform" Margin="0,2,0,2" />
-                    <TextBlock Text="{Binding Text}" Visibility="{Binding TextVisibility}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <Image Source="{Binding Thumb}" Visibility="{Binding ImageVisibility, Mode=OneTime}" Height="40" MaxWidth="200" HorizontalAlignment="Left" Stretch="Uniform" Margin="0,2,0,2" />
+                    <TextBlock Text="{Binding Text, Mode=OneTime}" Visibility="{Binding TextVisibility, Mode=OneTime}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,2,0">
-                    <TextBlock Text="&#xE718;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="11" Visibility="{Binding PinVisibility}" Margin="0,0,6,0" Opacity="0.8" />
-                    <TextBlock Text="{Binding When}" FontSize="11" Opacity="0.5" />
+                    <TextBlock Text="&#xE718;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="11" Visibility="{Binding PinVisibility, Mode=OneTime}" Margin="0,0,6,0" Opacity="0.8" />
+                    <TextBlock Text="{Binding When, Mode=OneTime}" FontSize="11" Opacity="0.5" />
                 </StackPanel>
             </Grid>
         </DataTemplate>
         """;
+
+    private bool _reallyClose;
+
+    /// <summary>Closes for good (on exit); a normal close only hides the window.</summary>
+    public void CloseForGood()
+    {
+        _reallyClose = true;
+        Close();
+    }
 
     private ClipItem? Selected => _list.SelectedItem as ClipItem;
 

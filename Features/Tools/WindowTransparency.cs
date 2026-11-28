@@ -52,6 +52,8 @@ internal sealed class WindowTransparency : IDisposable
 
     public void ApplySettings()
     {
+        if (S.Rules.Keys.Any(k => k != k.ToLowerInvariant()))
+            S.Rules = S.Rules.GroupBy(r => r.Key.ToLowerInvariant()).ToDictionary(g => g.Key, g => g.Last().Value);
         var mods = Hotkey.Parse(S.Modifiers + "+A");
         _keys = Enumerable.Range(0, 10).Select(d => mods with { Vk = 0x30 + d }).ToArray();
         if (S.Enabled)
@@ -79,32 +81,53 @@ internal sealed class WindowTransparency : IDisposable
 
     private void OnEvent(IntPtr hook, uint evt, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
     {
-        if (idObject != 0 || hwnd == IntPtr.Zero) return;
+        if (idObject != 0 || hwnd == IntPtr.Zero || S.Rules.Count == 0) return;
         if (GetAncestor(hwnd, 2 /* GA_ROOT */) != hwnd) return;
-        Apply(hwnd);
-        // Some windows finish setting themselves up after they're shown.
-        if (evt == Win32.EVENT_OBJECT_SHOW)
+        // Some windows finish setting themselves up after they're shown: check a matching one once more.
+        if (Apply(hwnd) && evt == Win32.EVENT_OBJECT_SHOW)
             new DispatcherTimer(TimeSpan.FromMilliseconds(400), DispatcherPriority.Background, (s, _) => { ((DispatcherTimer)s!).Stop(); Apply(hwnd); }, System.Windows.Application.Current.Dispatcher).Start();
     }
 
     private void ApplyAll()
     {
+        if (S.Rules.Count == 0) return;
         EnumWindows((h, _) => { if (Native.IsWindowVisible(h)) Apply(h); return true; }, IntPtr.Zero);
     }
 
-    private static string? Key(IntPtr hwnd)
+    /// <summary>pid → exe file name; windows are shown often (menus, tooltips), opening the process each time is wasteful.</summary>
+    private readonly Dictionary<uint, string> _exeByPid = new();
+
+    /// <summary>"exe|class" in lower case (settings reload as a plain dictionary, so keys must not depend on case).</summary>
+    private string? Key(IntPtr hwnd)
     {
-        string? path = Native.GetProcessPath(hwnd);
-        if (path is null) return null;
-        return Path.GetFileName(path) + "|" + Win32.ClassName(hwnd);
+        Native.GetWindowThreadProcessId(hwnd, out uint pid);
+        if (pid == 0) return null;
+        if (!_exeByPid.TryGetValue(pid, out var exe))
+        {
+            string? path = Native.GetProcessPath(hwnd);
+            if (path is null) return null;
+            if (_exeByPid.Count > 512) _exeByPid.Clear();
+            _exeByPid[pid] = exe = Path.GetFileName(path);
+        }
+        return RuleKey(exe, Win32.ClassName(hwnd));
     }
 
-    /// <summary>Applies the remembered level for this kind of window, if there is one.</summary>
-    private void Apply(IntPtr hwnd)
+    public static string RuleKey(string exe, string cls) => (exe + "|" + cls).ToLowerInvariant();
+
+    /// <summary>Applies the remembered level for this kind of window, if there is one. True if a rule matched.</summary>
+    private bool Apply(IntPtr hwnd)
     {
-        if (!S.Enabled || !Native.IsWindow(hwnd)) return;
-        if (Key(hwnd) is not { } key || !S.Rules.TryGetValue(key, out int level)) return;
+        if (!S.Enabled || !Native.IsWindow(hwnd)) return false;
+        if (Key(hwnd) is not { } key || !S.Rules.TryGetValue(key, out int level)) return false;
         Set(hwnd, level);
+        return true;
+    }
+
+    /// <summary>Removes a rule and makes that app's open windows solid again.</summary>
+    public void Forget(string key)
+    {
+        S.Rules.Remove(key);
+        EnumWindows((h, _) => { if (Native.IsWindowVisible(h) && Key(h) == key) Set(h, 0); return true; }, IntPtr.Zero);
     }
 
     /// <summary>Called by other features that change a window's alpha (Always On Top) to put this one's back.</summary>
@@ -130,19 +153,26 @@ internal sealed class WindowTransparency : IDisposable
 
     private void Set(IntPtr hwnd, int level)
     {
+        if (Native.IsHungAppWindow(hwnd)) return;   // style changes on a hung window would block us too
         long ex = Native.GetWindowLongPtr(hwnd, Native.GWL_EXSTYLE).ToInt64();
         bool layered = (ex & WS_EX_LAYERED) != 0;
+        byte current = 255;
+        if (layered && GetLayeredWindowAttributes(hwnd, out _, out byte a0, out uint flags) && (flags & LWA_ALPHA) != 0) current = a0;
         if (level <= 0)
         {
-            if (!_touched.Remove(hwnd, out bool added)) return;
-            SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+            // Also resets windows made see-through before this run (a previous session, or Glass2k).
+            bool added = _touched.Remove(hwnd, out bool a) && a;
+            if (current < 255) SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
             if (added && layered) Native.SetWindowLongPtr(hwnd, Native.GWL_EXSTYLE, (IntPtr)(ex & ~WS_EX_LAYERED));
             return;
         }
         byte alpha = Alpha(level);
-        if (layered && GetLayeredWindowAttributes(hwnd, out _, out byte current, out uint flags) && (flags & LWA_ALPHA) != 0 && current == alpha) return;
-        if (!layered) Native.SetWindowLongPtr(hwnd, Native.GWL_EXSTYLE, (IntPtr)(ex | WS_EX_LAYERED));
-        if (!SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA)) return;   // e.g. an admin window
+        if (current != alpha)
+        {
+            if (!layered) Native.SetWindowLongPtr(hwnd, Native.GWL_EXSTYLE, (IntPtr)(ex | WS_EX_LAYERED));
+            if (!SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA)) return;   // e.g. an admin window
+        }
+        // Track it even when it already had this alpha, so turning the feature off restores it.
         if (!_touched.ContainsKey(hwnd)) _touched[hwnd] = !layered;
     }
 
@@ -170,7 +200,7 @@ internal sealed class WindowTransparency : IDisposable
                 string exe = name[..(cut + 4)], cls = name[(cut + 4)..];
                 if (exe.Equals("Glass2k.exe", StringComparison.OrdinalIgnoreCase) || exe.Equals("Ditto.exe", StringComparison.OrdinalIgnoreCase)) continue;
                 if (level <= 0) continue;   // 0 = opaque, the same as no rule
-                s.Rules[exe + "|" + cls] = Math.Clamp(level, 1, 9);
+                s.Rules[RuleKey(exe, cls)] = Math.Clamp(level, 1, 9);
                 n++;
             }
         using (var opt = root.OpenSubKey("Settings"))
