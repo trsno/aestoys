@@ -20,11 +20,11 @@ internal static class TrayMenuStyle
 
     // Column layout in logical pixels.
     private const int Inset = 4;        // highlight inset from the window edge
-    private const int TextX = 44;       // text starts here; the icon is centred in 4..40
-    private const int RightCol = 40;    // chevron / check column at the right edge
-    private const int RowHeight = 36;
+    private const int TextX = 46;       // text starts here; the icon is centred in 8..40
+    private const int RightCol = 38;    // chevron / check column at the right edge
+    private const int RowHeight = 40;
     private const int SeparatorHeight = 9;
-    private const int MinWidth = 200;
+    private const int MinWidth = 180;
 
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
@@ -91,7 +91,7 @@ internal static class TrayMenuStyle
     private sealed class Renderer : ToolStripRenderer
     {
         public Color Back, Fore, Dim, Hover, Line, Border, Accent;
-        public readonly Font Font = new("Segoe UI", 9.75f);
+        public readonly Font Font = new(FontExists("Segoe UI Variable Text") ? "Segoe UI Variable Text" : "Segoe UI", 10.5f);
         private static readonly string IconFont = FontExists("Segoe Fluent Icons") ? "Segoe Fluent Icons" : "Segoe MDL2 Assets";
 
         public Renderer() => Refresh();
@@ -130,21 +130,21 @@ internal static class TrayMenuStyle
             if (item.Selected && item.Enabled)
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
-                using var path = RoundRect(new Rectangle(D(Inset), 1, w - 2 * D(Inset) - 1, h - 2), D(4));
+                using var path = RoundRect(new Rectangle(D(Inset), D(2), w - 2 * D(Inset) - 1, h - D(4)), D(5));
                 using var brush = new SolidBrush(Hover);
                 g.FillPath(brush, path);
             }
 
             var color = item.Enabled ? Fore : Dim;
             bool on = item.Checked, sub = item.HasDropDownItems;
-            var left = new Rectangle(D(Inset), 0, D(TextX - 4) - D(Inset), h);
+            var left = new Rectangle(D(8), 0, D(32), h);
             var right = new Rectangle(w - D(RightCol), 0, D(RightCol - 12), h);
 
-            if (item.Tag is string glyph) Glyph(g, glyph, left, on && sub && item.Enabled ? Accent : color, 11f);
-            else if (on) Glyph(g, Check, left, Accent, 11f);
+            if (item.Tag is string glyph) Glyph(g, glyph, left, on && sub && item.Enabled ? Accent : color, 12.5f);
+            else if (on) Glyph(g, Check, left, Accent, 11.5f);
 
             if (sub) Glyph(g, Chevron, right, color, 7f);
-            else if (on && item.Tag is string) Glyph(g, Check, right, Accent, 11f);
+            else if (on && item.Tag is string) Glyph(g, Check, right, Accent, 11.5f);
 
             var text = new Rectangle(D(TextX), 0, right.X - D(TextX), h);
             TextRenderer.DrawText(g, item.Text, item.Font, text, color,
