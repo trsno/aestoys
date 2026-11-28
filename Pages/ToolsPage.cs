@@ -28,9 +28,12 @@ public sealed class ToolsPage : Page
         var title = new TextBlock { Text = "Utilities", FontSize = 28, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 6) };
         title.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
         _root.Children.Add(title);
-        _root.Children.Add(Note(T.PowerToysImported
-            ? "Settings, layouts and history were imported from PowerToys."
-            : "Run aestoys with --import-powertoys once to bring over your PowerToys settings."));
+        var from = new List<string>();
+        if (T.PowerToysImported) from.Add("PowerToys");
+        if (T.Clipboard.DittoImported) from.Add("Ditto");
+        _root.Children.Add(Note(from.Count > 0
+            ? $"Settings, layouts and history were imported from {string.Join(" and ", from)}."
+            : "Run aestoys with --import-powertoys or --import-ditto once to bring over your old settings."));
 
         Section("Windows");
         Tool(SymbolRegular.Pin24, "Always On Top", $"{T.AlwaysOnTop.Hotkey} pins the active window on top with a coloured frame; {T.AlwaysOnTop.IncreaseOpacity} and {T.AlwaysOnTop.DecreaseOpacity} change its opacity",
@@ -70,6 +73,14 @@ public sealed class ToolsPage : Page
             () => T.CropAndLock.Enabled, v => T.CropAndLock.Enabled = v, null);
 
         Section("Tools");
+        Tool(SymbolRegular.ClipboardPaste24, "Clipboard history", $"{T.Clipboard.Hotkey} lists everything you've copied (text, images, files); Enter pastes, Shift+Enter pastes plain text",
+            () => T.Clipboard.Enabled, v => T.Clipboard.Enabled = v, body =>
+            {
+                body.Children.Add(Action("Your saved clips", "Open", () => App.Clips?.Show()));
+                body.Children.Add(Slider("Clips to keep (pinned ones are always kept)", 100, 5000, () => T.Clipboard.MaxEntries, v => T.Clipboard.MaxEntries = v, ""));
+                body.Children.Add(Note("Copies that password managers mark as private aren't saved."));
+            });
+
         Tool(SymbolRegular.Eyedropper24, "Color Picker", $"{T.ColorPicker.Hotkey} picks a colour from anywhere on screen and copies it as {T.ColorPicker.CopiedFormat}",
             () => T.ColorPicker.Enabled, v => T.ColorPicker.Enabled = v, body =>
             {
