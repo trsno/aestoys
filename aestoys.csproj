@@ -18,6 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="11.0.0" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>
 
@@ -27,8 +28,7 @@
 
   <ItemGroup>
     <!-- Native DLL, loaded at run time from next to aestoys.exe (not bundled into the single file). -->
-    <None Include="ThirdParty\VirtualDesktopAccessor\VirtualDesktopAccessor.dll" Link="VirtualDesktopAccessor.dll"
-          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="ThirdParty\VirtualDesktopAccessor\VirtualDesktopAccessor.dll" Link="VirtualDesktopAccessor.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
 </Project>

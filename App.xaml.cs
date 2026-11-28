@@ -40,6 +40,8 @@ public partial class App : Application
     internal static Features.Tools.CropAndLock? Crop { get; private set; }
     internal static Features.Tools.GrabAndMove? Grab { get; private set; }
     internal static Features.Tools.FancyZones? Zones { get; private set; }
+    internal static Features.Clipboard.ClipboardHistory? Clips { get; private set; }
+    private const string ClipboardEventName = @"Local\aestoys.clipboard";
     private const string DemoZonesEventName = @"Local\aestoys.demo-zones";
     private const string DemoColorEventName = @"Local\aestoys.demo-colorpicker";
     private const string ColorEditorEventName = @"Local\aestoys.color-editor";
@@ -82,7 +84,8 @@ public partial class App : Application
             bool demoColor = e.Args.Contains("--demo-colorpicker", StringComparer.OrdinalIgnoreCase);
             bool colorEditor = e.Args.Contains("--color-editor", StringComparer.OrdinalIgnoreCase);
             bool demoZones = e.Args.Contains("--demo-zones", StringComparer.OrdinalIgnoreCase);
-            string evt = demoZones ? DemoZonesEventName : colorEditor ? ColorEditorEventName : demoColor ? DemoColorEventName : demoLauncher ? DemoLauncherEventName : demoAll ? DemoAllEventName : demo ? DemoEventName : ShowEventName;
+            bool clipboard = e.Args.Contains("--clipboard", StringComparer.OrdinalIgnoreCase);
+            string evt = clipboard ? ClipboardEventName : demoZones ? DemoZonesEventName : colorEditor ? ColorEditorEventName : demoColor ? DemoColorEventName : demoLauncher ? DemoLauncherEventName : demoAll ? DemoAllEventName : demo ? DemoEventName : ShowEventName;
             try { EventWaitHandle.OpenExisting(evt).Set(); } catch { }
             _mutex = null;
             Shutdown();
@@ -97,6 +100,11 @@ public partial class App : Application
         {
             try { Log("import: " + Features.Tools.PowerToysImport.Run(Settings)); }
             catch (Exception ex) { Log("import failed: " + ex); }
+        }
+        if (e.Args.Contains("--import-ditto", StringComparer.OrdinalIgnoreCase))
+        {
+            try { Log("import: " + Features.Clipboard.DittoImport.Run(Settings)); }
+            catch (Exception ex) { Log("Ditto import failed: " + ex); }
         }
 
         // "Run as administrator": hand over to an elevated copy. If UAC is declined, keep running normally.
@@ -125,6 +133,7 @@ public partial class App : Application
             if (Hotkeys is not null) OnTop = new Features.Tools.AlwaysOnTop(Settings, Hotkeys);
             if (Hotkeys is not null && Hook is not null && Mouse is not null) { ColorPick = new Features.Tools.ColorPicker(Settings, Hotkeys, Hook, Mouse); Crop = new Features.Tools.CropAndLock(Settings, Hotkeys, Hook, Mouse); Grab = new Features.Tools.GrabAndMove(Settings, Hook, Mouse); }
             if (Hotkeys is not null) Zones = new Features.Tools.FancyZones(Settings, Hotkeys);
+            if (Hotkeys is not null) Clips = new Features.Clipboard.ClipboardHistory(Settings, Hotkeys);
         }
         catch (Exception ex) { Log("tools: " + ex); }
         ApplyFeatureSettings();
@@ -170,6 +179,13 @@ public partial class App : Application
         {
             while (demoColorEvent.WaitOne())
                 Dispatcher.BeginInvoke(() => ColorPick?.Demo(demoZoom++ % 2 == 0 ? 0 : 2));
+        }) { IsBackground = true }.Start();
+
+        var clipboardEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ClipboardEventName);
+        new Thread(() =>
+        {
+            while (clipboardEvent.WaitOne())
+                Dispatcher.BeginInvoke(() => Clips?.Show());
         }) { IsBackground = true }.Start();
 
         var demoZonesEvent = new EventWaitHandle(false, EventResetMode.AutoReset, DemoZonesEventName);
@@ -266,6 +282,7 @@ public partial class App : Application
         Awake?.Apply();
         OnTop?.ApplySettings();
         Zones?.ApplySettings();
+        Clips?.ApplySettings();
         Features.Tools.LocksmithMenu.Apply(Settings.Tools.Locksmith.Enabled, Settings.Tools.Locksmith.ExtendedMenuOnly);
     }
 
@@ -340,11 +357,12 @@ public partial class App : Application
         try { ColorPick?.Dispose(); } catch { }
         try { Crop?.Dispose(); } catch { }
         try { Zones?.Dispose(); } catch { }
+        try { Clips?.Dispose(); } catch { }
         try { Awake?.Dispose(); } catch { }
         try { Mouse?.Dispose(); } catch { }
         try { Hook?.Dispose(); } catch { }
         AltTab = null; Desktops = null; Placement = null; Launcher = null; Hook = null;
-        OnTop = null; Awake = null; Mouse = null; Hotkeys = null; ColorPick = null; Crop = null; Zones = null; Grab = null;
+        OnTop = null; Awake = null; Mouse = null; Hotkeys = null; ColorPick = null; Crop = null; Zones = null; Grab = null; Clips = null;
     }
 
     protected override void OnExit(ExitEventArgs e)

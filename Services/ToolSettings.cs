@@ -156,6 +156,17 @@ public sealed class FancyZonesSettings
     public List<ZoneHistoryEntry> History { get; set; } = new();
 }
 
+public sealed class ClipboardSettings
+{
+    public bool Enabled { get; set; } = false;
+    public Hotkey Hotkey { get; set; } = Hotkey.Parse("Win+V");
+    /// <summary>Clips kept (pinned ones don't count against it). Ditto's setting was 1500.</summary>
+    public int MaxEntries { get; set; } = 1500;
+    public bool DittoImported { get; set; }
+    public double Width { get; set; } = 460;
+    public double Height { get; set; } = 560;
+}
+
 public sealed class ToolsSettings
 {
     /// <summary>Set once the PowerToys settings have been imported (so it only happens once).</summary>
@@ -167,4 +178,5 @@ public sealed class ToolsSettings
     public LocksmithSettings Locksmith { get; set; } = new();
     public GrabAndMoveSettings GrabAndMove { get; set; } = new();
     public FancyZonesSettings FancyZones { get; set; } = new();
+    public ClipboardSettings Clipboard { get; set; } = new();
 }
