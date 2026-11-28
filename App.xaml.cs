@@ -3,6 +3,8 @@ using System.Linq;
 using System.Threading;
 using System.Windows;
 using Aestoys.Features.AltTab;
+using Aestoys.Features.Desktops;
+using Aestoys.Interop;
 using Aestoys.Services;
 using Wpf.Ui.Appearance;
 using Forms = System.Windows.Forms;
@@ -15,6 +17,7 @@ public partial class App : Application
     private const string ShowEventName = @"Local\aestoys.show-settings";
     private const string DemoEventName = @"Local\aestoys.demo";
     private const string DemoAllEventName = @"Local\aestoys.demo-all";
+    private const string DemoLauncherEventName = @"Local\aestoys.demo-launcher";
 
     private Mutex? _mutex;
     private EventWaitHandle? _showEvent;
@@ -23,6 +26,12 @@ public partial class App : Application
 
     internal static AppSettings Settings { get; private set; } = new();
     internal static AltTabController? AltTab { get; private set; }
+    internal static KeyboardHook? Hook { get; private set; }
+    /// <summary>Settings page to open first (--page alttab|desktops|general).</summary>
+    internal static string? StartPage { get; private set; }
+    internal static DesktopController? Desktops { get; private set; }
+    internal static WindowPlacement? Placement { get; private set; }
+    internal static StartLauncher? Launcher { get; private set; }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -36,7 +45,8 @@ public partial class App : Application
             // Already running: ask that instance to show its settings window.
             bool demoAll = e.Args.Contains("--demo-all", StringComparer.OrdinalIgnoreCase);
             bool demo = demoAll || e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
-            string evt = demoAll ? DemoAllEventName : demo ? DemoEventName : ShowEventName;
+            bool demoLauncher = e.Args.Contains("--demo-launcher", StringComparer.OrdinalIgnoreCase);
+            string evt = demoLauncher ? DemoLauncherEventName : demoAll ? DemoAllEventName : demo ? DemoEventName : ShowEventName;
             try { EventWaitHandle.OpenExisting(evt).Set(); } catch { }
             _mutex = null;
             Shutdown();
@@ -54,8 +64,20 @@ public partial class App : Application
             if (RestartElevated(e.Args.Contains("--tray", StringComparer.OrdinalIgnoreCase))) return;
         }
 
-        try { AltTab = new AltTabController(Settings, Dispatcher); }
+        try
+        {
+            Hook = new KeyboardHook();
+            AltTab = new AltTabController(Settings, Dispatcher, Hook);
+        }
         catch (Exception ex) { MessageBox.Show("Could not install the keyboard hook:\n" + ex.Message, "aestoys"); }
+        try
+        {
+            if (Hook is not null) Desktops = new DesktopController(Settings, Dispatcher, Hook);
+            Placement = new WindowPlacement(Settings);
+            ApplyFeatureSettings();
+        }
+        catch (Exception ex) { Log("desktop features: " + ex); }
+        DesktopController.ExplorerRestarted += OnExplorerRestarted;
 
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
         var listener = new Thread(() =>
@@ -78,8 +100,17 @@ public partial class App : Application
                 Dispatcher.BeginInvoke(() => AltTab?.Demo(3, allMonitors: true));
         }) { IsBackground = true }.Start();
 
+        var demoLauncherEvent = new EventWaitHandle(false, EventResetMode.AutoReset, DemoLauncherEventName);
+        new Thread(() =>
+        {
+            while (demoLauncherEvent.WaitOne())
+                Dispatcher.BeginInvoke(() => Launcher?.Demo(4));
+        }) { IsBackground = true }.Start();
+
         CreateTray();
 
+        int page = Array.FindIndex(e.Args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
+        if (page >= 0 && page + 1 < e.Args.Length) StartPage = e.Args[page + 1];
         if (!e.Args.Contains("--tray", StringComparer.OrdinalIgnoreCase))
             ShowSettings();
     }
@@ -114,6 +145,47 @@ public partial class App : Application
         _main.Activate();
     }
 
+    /// <summary>Starts or stops the desktop, placement and launcher features to match the settings.</summary>
+    internal static void ApplyFeatureSettings()
+    {
+        Desktops?.ApplySettings();
+        Placement?.ApplySettings();
+        if (Settings.Launcher.Enabled) { if (Launcher is null) Launcher = new StartLauncher(Settings); else Launcher.Reload(); }
+        else { Launcher?.Dispose(); Launcher = null; }
+    }
+
+    private System.Windows.Threading.DispatcherTimer? _explorerTimer;
+
+    /// <summary>
+    /// Explorer restarted: the DLL and the COM objects still point at the old Explorer, and rebuilding
+    /// them in place wasn't reliable (the AHK version learned this). Once Explorer has settled, start
+    /// a fresh copy and end this one without the normal COM cleanup, which Windows can kill with a
+    /// fail-fast in combase.dll. Repeated broadcasts push the timer back.
+    /// </summary>
+    private void OnExplorerRestarted()
+    {
+        _explorerTimer ??= new System.Windows.Threading.DispatcherTimer(TimeSpan.FromSeconds(5), System.Windows.Threading.DispatcherPriority.Normal, (_, _) => RestartAfterExplorer(), Dispatcher);
+        _explorerTimer.Stop();
+        _explorerTimer.Start();
+    }
+
+    private void RestartAfterExplorer()
+    {
+        _explorerTimer?.Stop();
+        Log("Explorer restarted: restarting aestoys");
+        try { Placement?.Dispose(); } catch { }
+        try { Desktops?.Dispose(); } catch { }
+        try { Launcher?.Dispose(); } catch { }
+        try { Hook?.Dispose(); } catch { }
+        if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); _tray = null; }
+        try
+        {
+            System.Diagnostics.Process.Start(Environment.ProcessPath!, "--tray --wait-mutex" + (Elevation.IsElevated ? "" : " --no-elevate"));
+        }
+        catch (Exception e) { Log("restart failed: " + e.Message); return; }
+        Win32.TerminateProcess(Win32.GetCurrentProcess(), 0);
+    }
+
     internal static void Log(string message)
     {
         try
@@ -136,14 +208,24 @@ public partial class App : Application
 
     internal void ExitApp()
     {
-        AltTab?.Dispose();
+        DisposeFeatures();
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
         Shutdown();
     }
 
+    private static void DisposeFeatures()
+    {
+        try { AltTab?.Dispose(); } catch { }
+        try { Desktops?.Dispose(); } catch { }
+        try { Placement?.Dispose(); } catch { }
+        try { Launcher?.Dispose(); } catch { }
+        try { Hook?.Dispose(); } catch { }
+        AltTab = null; Desktops = null; Placement = null; Launcher = null; Hook = null;
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
-        AltTab?.Dispose();
+        DisposeFeatures();
         _tray?.Dispose();
         base.OnExit(e);
     }

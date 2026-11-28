@@ -28,6 +28,11 @@
                         <ui:SymbolIcon Symbol="DesktopMac24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
+                <ui:NavigationViewItem Content="Desktops and taskbar" TargetPageType="{x:Type pages:DesktopsPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="TabDesktopMultiple20" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.FooterMenuItems>
                 <ui:NavigationViewItem Content="General" TargetPageType="{x:Type pages:GeneralPage}">

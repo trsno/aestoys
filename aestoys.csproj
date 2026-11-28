@@ -25,5 +25,11 @@
     <Resource Include="Assets\app.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Native DLL, loaded at run time from next to aestoys.exe (not bundled into the single file). -->
+    <None Include="ThirdParty\VirtualDesktopAccessor\VirtualDesktopAccessor.dll" Link="VirtualDesktopAccessor.dll"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
 </Project>
 

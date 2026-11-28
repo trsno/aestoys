@@ -1,0 +1,175 @@
+﻿<Page x:Class="Aestoys.Pages.DesktopsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Desktops and taskbar">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="32,24,32,32" MaxWidth="900">
+            <TextBlock Text="Desktops and taskbar" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,20"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+
+            <!-- ============================================================ virtual desktops -->
+            <TextBlock Text="Virtual desktops" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="ArrowSync24" /></ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Wrap around" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Ctrl+Win+Right on the last desktop goes to the first, Ctrl+Win+Left on the first goes to the last" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch x:Name="WrapToggle" Checked="OnChanged" Unchecked="OnChanged" />
+            </ui:CardControl>
+
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="WindowArrowUp24" /></ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Take the window along" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Ctrl+Win+Shift+Left/Right moves the active window to the previous/next desktop and goes with it (wraps around too)" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch x:Name="MoveToggle" Checked="OnChanged" Unchecked="OnChanged" />
+            </ui:CardControl>
+
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="Pin24" /></ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Show on all desktops" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Ctrl+Win+Shift+D pins the active window to every desktop and back. Pinned windows get a blue border." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch x:Name="PinToggle" Checked="OnChanged" Unchecked="OnChanged" />
+            </ui:CardControl>
+
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="GridDots24" /></ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Desktop indicator on the Start button" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Each pane of the Windows logo is a desktop with its number; the current one stays lit. Hidden while a fullscreen app runs." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch x:Name="IndicatorToggle" Checked="OnChanged" Unchecked="OnChanged" />
+            </ui:CardControl>
+
+            <ui:InfoBar x:Name="DllBar" Margin="0,4,0,4" IsOpen="True" IsClosable="False" />
+
+            <!-- ============================================================ windows -->
+            <TextBlock Text="Window placement" FontSize="14" FontWeight="SemiBold" Margin="0,20,0,8"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="AlignCenterHorizontal24" /></ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Open new windows centred" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="App windows open in the middle of the monitor they appear on. Dialogs, maximized windows and tabs you drag out are left alone." />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch x:Name="CenterToggle" Checked="OnChanged" Unchecked="OnChanged" />
+            </ui:CardControl>
+
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon><ui:SymbolIcon Symbol="KeyboardTab20" /></ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <StackPanel>
+                        <TextBlock Text="Alt+Space centres the active window" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="Replaces the window menu that Alt+Space normally opens" />
+                    </StackPanel>
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch x:Name="AltSpaceToggle" Checked="OnChanged" Unchecked="OnChanged" />
+            </ui:CardControl>
+
+            <!-- ============================================================ launcher -->
+            <TextBlock Text="Start button launcher" FontSize="14" FontWeight="SemiBold" Margin="0,20,0,8"
+                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+
+            <ui:CardExpander x:Name="LauncherExpander" Margin="0,0,0,4" IsExpanded="True">
+                <ui:CardExpander.Icon><ui:SymbolIcon Symbol="AppsListDetail24" /></ui:CardExpander.Icon>
+                <ui:CardExpander.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Pinned apps next to Start" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="Rest the mouse on the Start button and a bar of your apps slides in next to it" />
+                        </StackPanel>
+                        <ui:ToggleSwitch x:Name="LauncherToggle" Grid.Column="1" Margin="16,0,16,0" Checked="OnChanged" Unchecked="OnChanged" />
+                    </Grid>
+                </ui:CardExpander.Header>
+                <StackPanel>
+                    <TextBlock Text="Shortcuts folder" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,0,0,6" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Text="Every .lnk in this folder becomes a button, sorted by name (start names with a number to set the order)" />
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox x:Name="FolderBox" LostFocus="OnFolderChanged" />
+                        <ui:Button Grid.Column="1" Content="Browse" Margin="8,0,0,0" Click="OnBrowse" />
+                        <ui:Button Grid.Column="2" Content="Open" Margin="8,0,0,0" Click="OnOpenFolder" />
+                    </Grid>
+
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Include Windows Settings first" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <ui:ToggleSwitch x:Name="SettingsAppToggle" Grid.Column="1" Checked="OnChanged" Unchecked="OnChanged" />
+                    </Grid>
+
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Show after" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="How long the mouse rests on Start first (0 = instantly)" />
+                        </StackPanel>
+                        <TextBlock x:Name="HoverText" Grid.Column="1" Width="64" TextAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <Slider x:Name="HoverSlider" Grid.Column="2" Width="220" Minimum="0" Maximum="1000" TickFrequency="10" IsSnapToTickEnabled="True"
+                                VerticalAlignment="Center" ValueChanged="OnSliderChanged" />
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Hide after" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="Grace time after the mouse leaves the bar (0 = instantly)" />
+                        </StackPanel>
+                        <TextBlock x:Name="LeaveText" Grid.Column="1" Width="64" TextAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <Slider x:Name="LeaveSlider" Grid.Column="2" Width="220" Minimum="0" Maximum="1000" TickFrequency="10" IsSnapToTickEnabled="True"
+                                VerticalAlignment="Center" ValueChanged="OnSliderChanged" />
+                    </Grid>
+                </StackPanel>
+            </ui:CardExpander>
+
+            <ui:InfoBar Margin="0,12,0,0" IsOpen="True" IsClosable="False" Severity="Informational" Title="Admin windows"
+                        Message="Windows that run as administrator can only be moved, centred or pinned while aestoys runs as administrator too (General page)." />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

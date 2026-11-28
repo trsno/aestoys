@@ -48,8 +48,42 @@ public sealed class CoverflowSettings
     public double TimelineScalingFactor { get; set; } = 0.8;
 }
 
+public sealed class DesktopSettings
+{
+    /// <summary>Ctrl+Win+Right on the last desktop goes to the first, Ctrl+Win+Left on the first to the last.</summary>
+    public bool WrapAround { get; set; } = true;
+    /// <summary>Ctrl+Win+Shift+Left/Right takes the active window along to the previous/next desktop.</summary>
+    public bool MoveWindowKeys { get; set; } = true;
+    /// <summary>Ctrl+Win+Shift+D shows the active window on every desktop (blue border while pinned).</summary>
+    public bool PinKey { get; set; } = true;
+    /// <summary>Turns the Windows logo on the Start button into a 2×2 desktop indicator.</summary>
+    public bool Indicator { get; set; } = true;
+}
+
+public sealed class WindowPlacementSettings
+{
+    /// <summary>New app windows open centred on their monitor.</summary>
+    public bool CenterNewWindows { get; set; } = true;
+    /// <summary>Alt+Space centres the active window (instead of opening the system menu).</summary>
+    public bool AltSpaceCenters { get; set; } = true;
+}
+
+public sealed class LauncherSettings
+{
+    /// <summary>Resting the mouse on the Start button shows a bar of pinned apps next to it.</summary>
+    public bool Enabled { get; set; } = true;
+    public string Folder { get; set; } = @"C:\Warez\taskbar-launcher\shortcuts";
+    public bool IncludeSettingsApp { get; set; } = true;
+    public int HoverDelayMs { get; set; } = 0;
+    public int LeaveDelayMs { get; set; } = 0;
+}
+
 public sealed class AppSettings
 {
+    public DesktopSettings Desktops { get; set; } = new();
+    public WindowPlacementSettings Placement { get; set; } = new();
+    public LauncherSettings Launcher { get; set; } = new();
+
     public bool AltTabPerMonitorEnabled { get; set; } = true;
     public MonitorMode MonitorMode { get; set; } = MonitorMode.Cursor;
     public bool IncludeMinimized { get; set; } = true;

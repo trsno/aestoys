@@ -14,7 +14,12 @@ public partial class MainWindow : FluentWindow
         InitializeComponent();
         SystemThemeWatcher.Watch(this);
         Nav.SetPageProviderService(new PageProvider());
-        Loaded += (_, _) => Nav.Navigate(typeof(AltTabPage));
+Loaded += (_, _) => Nav.Navigate(App.StartPage?.ToLowerInvariant() switch
+        {
+            "desktops" => typeof(DesktopsPage),
+            "general" => typeof(GeneralPage),
+            _ => typeof(AltTabPage),
+        });
     }
 
     private sealed class PageProvider : INavigationViewPageProvider

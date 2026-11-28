@@ -180,7 +180,8 @@ internal static class Native
         {
             inputs[i].type = INPUT_KEYBOARD;
             inputs[i].U.ki.wVk = keys[i].vk;
-            inputs[i].U.ki.dwFlags = keys[i].up ? KEYEVENTF_KEYUP : 0;
+            bool extended = keys[i].vk is VK_LEFT or VK_UP or VK_RIGHT or VK_DOWN or VK_LWIN or VK_RWIN;
+            inputs[i].U.ki.dwFlags = (keys[i].up ? KEYEVENTF_KEYUP : 0) | (extended ? 0x0001u : 0);
             inputs[i].U.ki.dwExtraInfo = OwnInputTag;
         }
         SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());

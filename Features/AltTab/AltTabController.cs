@@ -31,12 +31,13 @@ internal sealed class AltTabController : IDisposable
     private int _index;
     private IntPtr _monitor;
 
-    public AltTabController(AppSettings settings, Dispatcher dispatcher)
+    public AltTabController(AppSettings settings, Dispatcher dispatcher, KeyboardHook hook)
     {
         _settings = settings;
         _dispatcher = dispatcher;
         _showDelay = new DispatcherTimer(TimeSpan.FromMilliseconds(120), DispatcherPriority.Normal, (_, _) => ShowOverlay(), dispatcher) { IsEnabled = false };
-        _hook = new KeyboardHook(OnKey);
+        _hook = hook;
+        hook.Add(OnKey);
 
         // Build the switcher window ahead of time so the first Alt+Tab doesn't pay for it.
         dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () =>
@@ -238,7 +239,7 @@ internal sealed class AltTabController : IDisposable
         _items = new();
     }
 
-    private static void Activate(IntPtr hwnd)
+    internal static void Activate(IntPtr hwnd)
     {
         if (!Native.IsWindow(hwnd)) return;
         if (Native.IsIconic(hwnd)) Native.ShowWindow(hwnd, Native.SW_RESTORE);
@@ -256,7 +257,6 @@ internal sealed class AltTabController : IDisposable
 
     public void Dispose()
     {
-        _hook.Dispose();
         _showDelay.Stop();
         _grid?.CloseView();
         _coverflow?.CloseView();

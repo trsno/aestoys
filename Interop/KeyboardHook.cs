@@ -15,14 +15,19 @@ internal sealed class KeyboardHook : IDisposable
     public delegate bool KeyHandler(int vk, bool isDown, bool altDown, bool injected);
 
     private readonly Native.LowLevelKeyboardProc _proc;
-    private readonly KeyHandler _handler;
+    private volatile KeyHandler[] _handlers = Array.Empty<KeyHandler>();
     private readonly Thread _thread;
     private uint _threadId;
     private IntPtr _hook;
 
-    public KeyboardHook(KeyHandler handler)
+    /// <summary>Adds a handler; handlers are asked in the order added and the first that returns true swallows the key.</summary>
+    public void Add(KeyHandler handler)
     {
-        _handler = handler;
+        lock (_thread) _handlers = [.. _handlers, handler];
+    }
+
+    public KeyboardHook()
+    {
         _proc = Callback; // keep delegate alive
         int error = 0;
         using var ready = new ManualResetEventSlim();
@@ -59,8 +64,9 @@ internal sealed class KeyboardHook : IDisposable
             bool alt = (data.flags & Native.LLKHF_ALTDOWN) != 0;
             try
             {
-                if (_handler((int)data.vkCode, down, alt, injected))
-                    return (IntPtr)1;
+                foreach (var handler in _handlers)
+                    if (handler((int)data.vkCode, down, alt, injected))
+                        return (IntPtr)1;
             }
             catch { /* never let an exception kill the hook */ }
         }
