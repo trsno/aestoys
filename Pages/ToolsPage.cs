@@ -31,9 +31,10 @@ public sealed class ToolsPage : Page
         var from = new List<string>();
         if (T.PowerToysImported) from.Add("PowerToys");
         if (T.Clipboard.DittoImported) from.Add("Ditto");
+        if (T.Transparency.Glass2kImported) from.Add("Glass2k");
         _root.Children.Add(Note(from.Count > 0
-            ? $"Settings, layouts and history were imported from {string.Join(" and ", from)}."
-            : "Run aestoys with --import-powertoys or --import-ditto once to bring over your old settings."));
+            ? $"Settings, layouts and history were imported from {(from.Count > 1 ? string.Join(", ", from.Take(from.Count - 1)) + " and " + from[^1] : from[0])}."
+            : "Run aestoys with --import-powertoys, --import-ditto or --import-glass2k once to bring over your old settings."));
 
         Section("Windows");
         Tool(SymbolRegular.Pin24, "Always On Top", $"{T.AlwaysOnTop.Hotkey} pins the active window on top with a coloured frame; {T.AlwaysOnTop.IncreaseOpacity} and {T.AlwaysOnTop.DecreaseOpacity} change its opacity",
@@ -72,6 +73,29 @@ public sealed class ToolsPage : Page
         Tool(SymbolRegular.Crop24, "Crop And Lock", $"{T.CropAndLock.ThumbnailHotkey}, then drag over the active window: the chosen part opens as its own live window",
             () => T.CropAndLock.Enabled, v => T.CropAndLock.Enabled = v, null);
 
+        Tool(SymbolRegular.Blur24, "Window transparency", $"{T.Transparency.Modifiers}+1…9 makes the active window see-through (1 = most), {T.Transparency.Modifiers}+0 makes it solid again",
+            () => T.Transparency.Enabled, v => T.Transparency.Enabled = v, body =>
+            {
+                var mods = new[] { "Ctrl+Shift", "Ctrl+Alt", "Alt+Shift", "Ctrl+Alt+Shift" };
+                body.Children.Add(Choice("Hold with a number key", mods, () => Math.Max(0, Array.IndexOf(mods, T.Transparency.Modifiers)), v => T.Transparency.Modifiers = mods[v]));
+                body.Children.Add(Switch("Remember the level for that app's windows", () => T.Transparency.Remember, v => T.Transparency.Remember = v));
+                if (T.Transparency.Rules.Count > 0)
+                {
+                    body.Children.Add(Note("Remembered:"));
+                    foreach (var rule in T.Transparency.Rules.OrderBy(r => r.Key, StringComparer.OrdinalIgnoreCase).ToList())
+                    {
+                        var parts = rule.Key.Split('|');
+                        string name = System.IO.Path.GetFileNameWithoutExtension(parts[0]);
+                        UIElement row = null!;
+                        row = Action($"{name}  ·  level {rule.Value}  ({100 * Features.Tools.WindowTransparency.Alpha(rule.Value) / 255}% visible)", "Forget", () =>
+                        {
+                            Changed(() => T.Transparency.Rules.Remove(rule.Key));
+                            ((Panel)((FrameworkElement)row).Parent).Children.Remove(row);
+                        });
+                        body.Children.Add(row);
+                    }
+                }
+            });
         Section("Tools");
         Tool(SymbolRegular.ClipboardPaste24, "Clipboard history", $"{T.Clipboard.Hotkey} lists everything you've copied (text, images, files); Enter pastes, Shift+Enter pastes plain text",
             () => T.Clipboard.Enabled, v => T.Clipboard.Enabled = v, body =>

@@ -167,6 +167,18 @@ public sealed class ClipboardSettings
     public double Height { get; set; } = 560;
 }
 
+public sealed class WindowTransparencySettings
+{
+    public bool Enabled { get; set; } = false;
+    /// <summary>Held with 0-9 to set the active window's transparency.</summary>
+    public string Modifiers { get; set; } = "Ctrl+Shift";
+    /// <summary>Remember the level for that kind of window (exe + window class).</summary>
+    public bool Remember { get; set; } = true;
+    /// <summary>"exe|window class" -> level 1-9.</summary>
+    public Dictionary<string, int> Rules { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public bool Glass2kImported { get; set; }
+}
+
 public sealed class ToolsSettings
 {
     /// <summary>Set once the PowerToys settings have been imported (so it only happens once).</summary>
@@ -179,4 +191,5 @@ public sealed class ToolsSettings
     public GrabAndMoveSettings GrabAndMove { get; set; } = new();
     public FancyZonesSettings FancyZones { get; set; } = new();
     public ClipboardSettings Clipboard { get; set; } = new();
+    public WindowTransparencySettings Transparency { get; set; } = new();
 }

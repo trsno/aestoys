@@ -114,6 +114,7 @@ internal sealed class AlwaysOnTop : IDisposable
         {
             Native.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
             RestoreAlpha(p);
+            App.Glass?.Reapply(hwnd);   // keep its remembered transparency
         }
         p.Frame?.Dispose();
         if (sound && S.Sound) Play("Speech Sleep.wav");

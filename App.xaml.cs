@@ -41,6 +41,7 @@ public partial class App : Application
     internal static Features.Tools.GrabAndMove? Grab { get; private set; }
     internal static Features.Tools.FancyZones? Zones { get; private set; }
     internal static Features.Clipboard.ClipboardHistory? Clips { get; private set; }
+    internal static Features.Tools.WindowTransparency? Glass { get; private set; }
     private const string ClipboardEventName = @"Local\aestoys.clipboard";
     private const string DemoZonesEventName = @"Local\aestoys.demo-zones";
     private const string DemoColorEventName = @"Local\aestoys.demo-colorpicker";
@@ -106,6 +107,11 @@ public partial class App : Application
             try { Log("import: " + Features.Clipboard.DittoImport.Run(Settings)); }
             catch (Exception ex) { Log("Ditto import failed: " + ex); }
         }
+        if (e.Args.Contains("--import-glass2k", StringComparer.OrdinalIgnoreCase))
+        {
+            try { Log(Features.Tools.WindowTransparency.ImportGlass2k(Settings)); }
+            catch (Exception ex) { Log("Glass2k import failed: " + ex); }
+        }
 
         // "Run as administrator": hand over to an elevated copy. If UAC is declined, keep running normally.
         if (Settings.RunAsAdmin && !Elevation.IsElevated && !e.Args.Contains("--no-elevate", StringComparer.OrdinalIgnoreCase))
@@ -134,6 +140,7 @@ public partial class App : Application
             if (Hotkeys is not null && Hook is not null && Mouse is not null) { ColorPick = new Features.Tools.ColorPicker(Settings, Hotkeys, Hook, Mouse); Crop = new Features.Tools.CropAndLock(Settings, Hotkeys, Hook, Mouse); Grab = new Features.Tools.GrabAndMove(Settings, Hook, Mouse); }
             if (Hotkeys is not null) Zones = new Features.Tools.FancyZones(Settings, Hotkeys);
             if (Hotkeys is not null) Clips = new Features.Clipboard.ClipboardHistory(Settings, Hotkeys);
+            if (Hotkeys is not null) Glass = new Features.Tools.WindowTransparency(Settings, Hotkeys);
         }
         catch (Exception ex) { Log("tools: " + ex); }
         ApplyFeatureSettings();
@@ -283,6 +290,7 @@ public partial class App : Application
         OnTop?.ApplySettings();
         Zones?.ApplySettings();
         Clips?.ApplySettings();
+        Glass?.ApplySettings();
         Features.Tools.LocksmithMenu.Apply(Settings.Tools.Locksmith.Enabled, Settings.Tools.Locksmith.ExtendedMenuOnly);
     }
 
@@ -358,11 +366,12 @@ public partial class App : Application
         try { Crop?.Dispose(); } catch { }
         try { Zones?.Dispose(); } catch { }
         try { Clips?.Dispose(); } catch { }
+        try { Glass?.Dispose(); } catch { }
         try { Awake?.Dispose(); } catch { }
         try { Mouse?.Dispose(); } catch { }
         try { Hook?.Dispose(); } catch { }
         AltTab = null; Desktops = null; Placement = null; Launcher = null; Hook = null;
-        OnTop = null; Awake = null; Mouse = null; Hotkeys = null; ColorPick = null; Crop = null; Zones = null; Grab = null; Clips = null;
+        OnTop = null; Awake = null; Mouse = null; Hotkeys = null; ColorPick = null; Crop = null; Zones = null; Grab = null; Clips = null; Glass = null;
     }
 
     protected override void OnExit(ExitEventArgs e)
