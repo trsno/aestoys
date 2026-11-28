@@ -203,6 +203,7 @@ public sealed class ToolsPage : Page
         card.Background = System.Windows.Media.Brushes.Transparent;
         card.BorderThickness = new Thickness(0);
         card.Margin = new Thickness(0);
+        SettingsStyle.FlattenTemplate(card);
         if (_group is null) { _root.Children.Add(card); return; }
         if (_group.Children.Count > 0)
         {

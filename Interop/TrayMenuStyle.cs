@@ -10,11 +10,21 @@ namespace Aestoys.Interop;
 /// <summary>
 /// Windows 11 look for the tray menu: follows the taskbar's light/dark setting, rounded corners,
 /// roomy rows with rounded highlights, Fluent icons and accent-coloured check marks.
-/// Put an icon on an item with <see cref="Icon"/>.
+/// Every row uses the same columns, in the main menu and in submenus:
+/// [icon or check] [text] [chevron or check]. Put an icon on an item with <see cref="Icon"/>.
 /// </summary>
 internal static class TrayMenuStyle
 {
-    public const string Settings = "", Awake = "", Eye = "", Exit = "", Screen = "", Off = "", Clock = "", Infinite = "";
+    public const string Settings = "", Awake = "", Eye = "", Exit = "", Screen = "";
+    private const string Check = "", Chevron = "";
+
+    // Column layout in logical pixels.
+    private const int Inset = 4;        // highlight inset from the window edge
+    private const int TextX = 44;       // text starts here; the icon is centred in 4..40
+    private const int RightCol = 40;    // chevron / check column at the right edge
+    private const int RowHeight = 36;
+    private const int SeparatorHeight = 9;
+    private const int MinWidth = 200;
 
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
@@ -23,42 +33,52 @@ internal static class TrayMenuStyle
     public static void Apply(ContextMenuStrip menu)
     {
         var renderer = new Renderer();
-        menu.Renderer = renderer;
-        menu.ShowCheckMargin = false;
-        menu.ShowImageMargin = true;
-        menu.Font = new Font("Segoe UI", 9.75f);
         menu.ShowItemToolTips = true;
         menu.Opening += (_, _) => { renderer.Refresh(); Style(menu, renderer); };
         Style(menu, renderer);
     }
 
-    /// <summary>Sizing and window corners for a menu and its submenus (call again after items change).</summary>
+    /// <summary>Sizes every row of a menu and its submenus (call again after items change).</summary>
     private static void Style(ToolStripDropDownMenu menu, Renderer r)
     {
         menu.Renderer = r;
         menu.ShowCheckMargin = false;
-        menu.ShowImageMargin = true;
-        menu.Font = new Font("Segoe UI", 9.75f);
+        menu.ShowImageMargin = false;
+        menu.Font = r.Font;
         menu.BackColor = r.Back;
         menu.Padding = new Padding(0, menu.LogicalToDeviceUnits(4), 0, menu.LogicalToDeviceUnits(4));
-        menu.ImageScalingSize = new Size(menu.LogicalToDeviceUnits(20), menu.LogicalToDeviceUnits(20));
-        if (!menu.IsHandleCreated) menu.HandleCreated += (_, _) => Round(menu, r);
-        else Round(menu, r);
+        if (menu.Tag is not true)
+        {
+            menu.Tag = true;
+            menu.HandleCreated += (_, _) => Round(menu, r);
+            if (menu.IsHandleCreated) Round(menu, r);
+        }
+        else if (menu.IsHandleCreated) Round(menu, r);
+
+        // One width for the whole menu: the widest text plus the fixed columns.
+        int width = menu.LogicalToDeviceUnits(MinWidth);
+        foreach (ToolStripItem item in menu.Items)
+            if (item is not ToolStripSeparator)
+                width = Math.Max(width, menu.LogicalToDeviceUnits(TextX + RightCol + 8) + TextRenderer.MeasureText(item.Text ?? "", r.Font).Width);
+
+        int height = menu.Padding.Vertical;
         foreach (ToolStripItem item in menu.Items)
         {
-            if (item is ToolStripSeparator) continue;
-            int v = menu.LogicalToDeviceUnits(6);
-            item.Padding = new Padding(0, v, menu.LogicalToDeviceUnits((item is ToolStripMenuItem { HasDropDownItems: true } ? 8 : 12) + Shift), v);
+            item.AutoSize = false;
+            item.Margin = Padding.Empty;
+            item.Padding = Padding.Empty;
+            item.Size = new Size(width, menu.LogicalToDeviceUnits(item is ToolStripSeparator ? SeparatorHeight : RowHeight));
+            if (item.Available) height += item.Height;   // Available = will be shown (Visible is false while the menu is closed)
             if (item is ToolStripMenuItem { HasDropDownItems: true } sub && sub.DropDown is ToolStripDropDownMenu dd)
             {
-                if (dd.Tag is not true) { dd.Tag = true; dd.Opening += (_, _) => Style(dd, r); }
+                if (dd.Tag is not true) dd.Opening += (_, _) => Style(dd, r);
                 Style(dd, r);
             }
         }
+        // The menu would size itself from its own text measurement and cut the rows short.
+        menu.AutoSize = false;
+        menu.Size = new Size(width, height);
     }
-
-    /// <summary>Extra room between the icon column and the text (logical pixels).</summary>
-    private const int Shift = 14;
 
     private static void Round(Control c, Renderer r)
     {
@@ -71,6 +91,7 @@ internal static class TrayMenuStyle
     private sealed class Renderer : ToolStripRenderer
     {
         public Color Back, Fore, Dim, Hover, Line, Border, Accent;
+        public readonly Font Font = new("Segoe UI", 9.75f);
         private static readonly string IconFont = FontExists("Segoe Fluent Icons") ? "Segoe Fluent Icons" : "Segoe MDL2 Assets";
 
         public Renderer() => Refresh();
@@ -93,68 +114,50 @@ internal static class TrayMenuStyle
         protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e) => e.Graphics.Clear(Back);
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e) { }   // DWM draws the rounded border
         protected override void OnRenderImageMargin(ToolStripRenderEventArgs e) { }
+        protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e) { }
+        protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e) { }
+        protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e) { }
+        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e) { }
 
+        /// <summary>The whole row: highlight, icon, text and the right-hand chevron or check.</summary>
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
         {
-            var item = e.Item;
+            if (e.Item is not ToolStripMenuItem item || item.Owner is not { } o) return;
             var g = e.Graphics;
+            int w = Math.Min(item.Width, o.ClientSize.Width - item.Bounds.X), h = item.Height;
+            int D(int v) => o.LogicalToDeviceUnits(v);
+
             if (item.Selected && item.Enabled)
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
-                int inset = item.Owner!.LogicalToDeviceUnits(4);
-                var rect = new Rectangle(inset, 1, Visible(item) - 2 * inset - 1, item.Height - 2);
-                using var path = RoundRect(rect, item.Owner.LogicalToDeviceUnits(4));
+                using var path = RoundRect(new Rectangle(D(Inset), 1, w - 2 * D(Inset) - 1, h - 2), D(4));
                 using var brush = new SolidBrush(Hover);
                 g.FillPath(brush, path);
             }
-            // Items with an icon show their on/off state as a check on the right (submenus tint the icon instead).
-            // Drawn here because the text pass is clipped to the text area.
-            if (item is ToolStripMenuItem { Checked: true, HasDropDownItems: false } && item.Tag is string)
-            {
-                var o = item.Owner!;
-                Glyph(g, "\uE73E", new Rectangle(Visible(item) - o.LogicalToDeviceUnits(36), 0, o.LogicalToDeviceUnits(24), item.Height), Accent, 11f);
-            }
-        }
 
-        /// <summary>The item's width inside the menu window (items can be laid out wider than the window).</summary>
-        private static int Visible(ToolStripItem item) => item.Owner is { } o ? Math.Min(item.Width, o.ClientSize.Width - item.Bounds.X - o.Padding.Right) : item.Width;
-
-        protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e) { }   // drawn with the text
-        protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e) { }
-
-        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-        {
-            var item = e.Item;
-            var owner = item.Owner!;
             var color = item.Enabled ? Fore : Dim;
-            int shift = owner.LogicalToDeviceUnits(Shift);
-            var text = new Rectangle(e.TextRectangle.X + shift, 0, e.TextRectangle.Width, item.Height);
-            if (item is ToolStripMenuItem mi && owner is ToolStripDropDownMenu)
-            {
-                var iconBox = new Rectangle(owner.LogicalToDeviceUnits(4), 0, text.X - owner.LogicalToDeviceUnits(10), item.Height);
-                bool on = mi.Checked;
-                if (item.Tag is string glyph)
-                    Glyph(e.Graphics, glyph, iconBox, !item.Enabled ? Dim : on && mi.HasDropDownItems ? Accent : color, 11f);
-                else if (on)
-                    Glyph(e.Graphics, "\uE73E", iconBox, Accent, 11f);
+            bool on = item.Checked, sub = item.HasDropDownItems;
+            var left = new Rectangle(D(Inset), 0, D(TextX - 4) - D(Inset), h);
+            var right = new Rectangle(w - D(RightCol), 0, D(RightCol - 12), h);
 
-            }
-            TextRenderer.DrawText(e.Graphics, e.Text, e.TextFont, text, color,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.HidePrefix | TextFormatFlags.NoPadding);
-        }
+            if (item.Tag is string glyph) Glyph(g, glyph, left, on && sub && item.Enabled ? Accent : color, 11f);
+            else if (on) Glyph(g, Check, left, Accent, 11f);
 
-        protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
-        {
-            var r = e.ArrowRectangle;
-            Glyph(e.Graphics, "", new Rectangle(r.X - 8, 0, r.Width, e.Item?.Height ?? r.Height), e.Item?.Enabled == false ? Dim : Fore, 7f);
+            if (sub) Glyph(g, Chevron, right, color, 7f);
+            else if (on && item.Tag is string) Glyph(g, Check, right, Accent, 11f);
+
+            var text = new Rectangle(D(TextX), 0, right.X - D(TextX), h);
+            TextRenderer.DrawText(g, item.Text, item.Font, text, color,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.HidePrefix | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
         }
 
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
         {
             int inset = e.Item.Owner?.LogicalToDeviceUnits(12) ?? 12;
+            int w = Math.Min(e.Item.Width, (e.Item.Owner?.ClientSize.Width ?? e.Item.Width) - e.Item.Bounds.X);
             int y = e.Item.Height / 2;
             using var pen = new Pen(Line);
-            e.Graphics.DrawLine(pen, inset, y, e.Item.Width - inset, y);
+            e.Graphics.DrawLine(pen, inset, y, w - inset, y);
         }
 
         private static void Glyph(Graphics g, string glyph, Rectangle box, Color color, float size)

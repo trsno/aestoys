@@ -68,11 +68,43 @@ internal static class SettingsStyle
         return bar;
     }
 
+    /// <summary>
+    /// An expander's template paints its open body as a separate lighter box with its own border,
+    /// which shows as a stray line at the bottom of the panel. Clear the template's own boxes.
+    /// </summary>
+    public static void FlattenTemplate(Control card)
+    {
+        if (card is not CardExpander) return;
+        void Clear()
+        {
+            foreach (var b in Descendants(card).OfType<Border>())
+                if (ReferenceEquals(b.TemplatedParent, card))
+                {
+                    b.Background = Brushes.Transparent;
+                    b.BorderThickness = new Thickness(0);
+                }
+        }
+        card.Loaded += (_, _) => Clear();
+        if (card is CardExpander ex) ex.Expanded += (_, _) => ex.Dispatcher.BeginInvoke(Clear, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        int n = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++)
+        {
+            var c = VisualTreeHelper.GetChild(root, i);
+            yield return c;
+            foreach (var d in Descendants(c)) yield return d;
+        }
+    }
+
     private static void Flatten(Control card)
     {
         card.Background = Brushes.Transparent;
         card.BorderThickness = new Thickness(0);
         card.Margin = new Thickness(0);
+        FlattenTemplate(card);
 
         switch (card)
         {

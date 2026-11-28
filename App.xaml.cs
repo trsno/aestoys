@@ -259,7 +259,7 @@ public partial class App : Application
         menu.Items.Add(awake);
         menu.Opening += (_, _) => FillAwakeMenu(awake);
         FillAwakeMenu(awake);
-        var eyes = new Forms.ToolStripMenuItem("Eye rest reminders") { CheckOnClick = true, ShortcutKeyDisplayString = "\u2003\u2003" }.Icon(Interop.TrayMenuStyle.Eye);
+        var eyes = new Forms.ToolStripMenuItem("Eye rest reminders") { CheckOnClick = true }.Icon(Interop.TrayMenuStyle.Eye);
         eyes.Click += (_, _) => { Settings.Tools.EyeRest.Enabled = eyes.Checked; Settings.Save(); ApplyFeatureSettings(); };
         menu.Items.Add(eyes);
         menu.Opening += (_, _) =>
