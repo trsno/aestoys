@@ -62,15 +62,18 @@ internal sealed class DesktopIndicator : IDisposable
         catch (Exception e) { App.Log("indicator: " + e.Message); }
     }
 
+    // AutoHotkey's Round() sends .5 away from zero; C#'s default goes to even and lands 1 px off the logo.
+    private static int R(double v) => (int)Math.Round(v, MidpointRounding.AwayFromZero);
+
     private void Draw(int count, int idx, int tx, int ty, int th, double s)
     {
         // Windows logo geometry, measured at 150%: panes 17 px, gap 1 px, centre x = 32 logical px.
         const double LogoCx = 32, LogoPane = 17 / 1.5, LogoGap = 1 / 1.5;
-        int pane = (int)Math.Round(LogoPane * s);
-        int gap = Math.Max(1, (int)Math.Round(LogoGap * s));
+        int pane = R(LogoPane * s);
+        int gap = Math.Max(1, R(LogoGap * s));
         int size = 2 * pane + gap;
-        int x = tx + (int)Math.Round(LogoCx * s - size / 2.0);
-        int y = ty + (int)Math.Round(th / 2.0 - size / 2.0);
+        int x = tx + R(LogoCx * s - size / 2.0);
+        int y = ty + R(th / 2.0 - size / 2.0);
 
         // Which 4 desktops to show: pages of 4, the last page always full.
         int first = Math.Min(Math.Max(idx, 0) / 4 * 4, Math.Max(count - 4, 0));

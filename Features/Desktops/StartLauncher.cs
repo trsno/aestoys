@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -181,13 +181,13 @@ internal sealed class StartLauncher : IDisposable
         if (tray == IntPtr.Zero || !Native.GetWindowRect(tray, out var r)) return null;
         double s = Win32.GetDpiForWindow(tray) / 96.0;
         if (s <= 0) return null;
-        int startW = (int)Math.Round(55.33 * s), slotW = (int)Math.Round(44 * s);
-        return new Geometry(r.Left, r.Top, r.Height, s, startW, slotW, (int)Math.Round(24 * s), r.Left + startW, slotW * _items.Count);
+        int startW = RoundA(55.33 * s), slotW = RoundA(44 * s);
+        return new Geometry(r.Left, r.Top, r.Height, s, startW, slotW, RoundA(24 * s), r.Left + startW, slotW * _items.Count);
     }
 
     private void Tick()
     {
-        // Taskbar geometry is cached for 1 s while the bar is hidden (this runs 50×/s and the
+        // Taskbar geometry is cached for 1 s while the bar is hidden (this runs 50Ã—/s and the
         // taskbar almost never moves) and refreshed every tick while the bar is shown.
         long now = Environment.TickCount64;
         if (_shown || _cache is null || now - _cacheAt > 1000) { _cache = Measure(); _cacheAt = now; }
@@ -235,7 +235,7 @@ internal sealed class StartLauncher : IDisposable
 
         // Match the taskbar's colour: sample an empty pixel at the Start button's top-left corner.
         IntPtr hdc = Win32.GetDC(IntPtr.Zero);
-        uint c = Win32.GetPixel(hdc, g.Tx + (int)Math.Round(3 * g.S), g.Ty + (int)Math.Round(3 * g.S));
+        uint c = Win32.GetPixel(hdc, g.Tx + RoundA(3 * g.S), g.Ty + RoundA(3 * g.S));
         Win32.ReleaseDC(IntPtr.Zero, hdc);
         int r = (int)(c & 0xFF), gr = (int)((c >> 8) & 0xFF), b = (int)((c >> 16) & 0xFF);
         _bg = Color.FromArgb(255, r, gr, b);
@@ -254,7 +254,7 @@ internal sealed class StartLauncher : IDisposable
     private void Draw(Geometry g)
     {
         // The bar is ~4 px shorter than the taskbar (2 px top and bottom at 150%), vertically centred.
-        int inset = Math.Max(1, (int)Math.Round(2 * g.S / 1.5));
+        int inset = Math.Max(1, RoundA(2 * g.S / 1.5));
         int w = g.W, h = g.Th - 2 * inset;
         if (w <= 0 || h <= 0) return;
         using var bmp = new Bitmap(w, h, PixelFormat.Format32bppPArgb);
@@ -299,6 +299,8 @@ internal sealed class StartLauncher : IDisposable
         }
         catch (Exception e) { App.Log("launcher: " + e.Message); }
     }
+
+    private static int RoundA(double v) => (int)Math.Round(v, MidpointRounding.AwayFromZero);
 
     public void Dispose()
     {
