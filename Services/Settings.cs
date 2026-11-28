@@ -83,6 +83,7 @@ public sealed class AppSettings
     public DesktopSettings Desktops { get; set; } = new();
     public WindowPlacementSettings Placement { get; set; } = new();
     public LauncherSettings Launcher { get; set; } = new();
+    public ToolsSettings Tools { get; set; } = new();
 
     public bool AltTabPerMonitorEnabled { get; set; } = true;
     public MonitorMode MonitorMode { get; set; } = MonitorMode.Cursor;

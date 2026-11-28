@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -9,15 +9,15 @@ using Aestoys.Interop;
 namespace Aestoys.Features.Desktops;
 
 /// <summary>
-/// Turns the Windows logo on the Start button into a 2Ã—2 desktop indicator:
+/// Turns the Windows logo on the Start button into a 2×2 desktop indicator:
 /// <list type="bullet">
 /// <item>each logo pane is one desktop, with its number inside;</item>
 /// <item>inactive desktops are darkened (black 50%), the active one is left clear so the logo shows;</item>
-/// <item>with more than 4 desktops it shows a page of 4 (1-4, 5-8â€¦), the last page always full.</item>
+/// <item>with more than 4 desktops it shows a page of 4 (1-4, 5-8…), the last page always full.</item>
 /// </list>
 /// Geometry follows the taskbar's own DPI every tick, so changes of main monitor, resolution or
 /// scaling are picked up. Click-through, always on top, hidden for fullscreen apps. The registry is
-/// polled ~7Ã—/s and it only redraws on change. Assumes left-aligned taskbar icons.
+/// polled ~7×/s and it only redraws on change. Assumes left-aligned taskbar icons.
 /// </summary>
 internal sealed class DesktopIndicator : IDisposable
 {

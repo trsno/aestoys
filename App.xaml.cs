@@ -33,8 +33,30 @@ public partial class App : Application
     internal static WindowPlacement? Placement { get; private set; }
     internal static StartLauncher? Launcher { get; private set; }
 
+    private const string ExitEventName = @"Local\aestoys.exit";
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        // File Locksmith runs as its own short-lived window, separate from the tray instance.
+        int lockIdx = Array.FindIndex(e.Args, a => a.Equals("--locksmith", StringComparison.OrdinalIgnoreCase));
+        if (lockIdx >= 0)
+        {
+            base.OnStartup(e);
+            DispatcherUnhandledException += (_, ex) => { Log("locksmith: " + ex.Exception); ex.Handled = true; };
+            Settings = AppSettings.Load();
+            ShutdownMode = ShutdownMode.OnLastWindowClose;
+            if (!Features.Tools.LocksmithWindow.Run(e.Args.Skip(lockIdx + 1), out _)) Shutdown();
+            return;
+        }
+
+        // --exit: ask the running copy to quit cleanly (undoing what it changed on other windows).
+        if (e.Args.Contains("--exit", StringComparer.OrdinalIgnoreCase))
+        {
+            try { EventWaitHandle.OpenExisting(ExitEventName).Set(); } catch { }
+            Shutdown();
+            return;
+        }
+
         bool waitForPrevious = e.Args.Contains("--wait-mutex", StringComparer.OrdinalIgnoreCase);
         _mutex = new Mutex(false, MutexName);
         bool owned;
@@ -98,6 +120,12 @@ public partial class App : Application
         {
             while (demoAllEvent.WaitOne())
                 Dispatcher.BeginInvoke(() => AltTab?.Demo(3, allMonitors: true));
+        }) { IsBackground = true }.Start();
+
+        var exitEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ExitEventName);
+        new Thread(() =>
+        {
+            if (exitEvent.WaitOne()) Dispatcher.BeginInvoke(ExitApp);
         }) { IsBackground = true }.Start();
 
         var demoLauncherEvent = new EventWaitHandle(false, EventResetMode.AutoReset, DemoLauncherEventName);

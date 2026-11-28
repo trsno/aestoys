@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -187,7 +187,7 @@ internal sealed class StartLauncher : IDisposable
 
     private void Tick()
     {
-        // Taskbar geometry is cached for 1 s while the bar is hidden (this runs 50Ã—/s and the
+        // Taskbar geometry is cached for 1 s while the bar is hidden (this runs 50×/s and the
         // taskbar almost never moves) and refreshed every tick while the bar is shown.
         long now = Environment.TickCount64;
         if (_shown || _cache is null || now - _cacheAt > 1000) { _cache = Measure(); _cacheAt = now; }

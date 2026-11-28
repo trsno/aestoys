@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -88,8 +88,8 @@ public partial class AltTabPage : Page
 
         Conditional(Section(p, "Timeline"), () => C.Style == CoverflowStyle.Timeline);
         Conditional(Slider(p, "Window layout distance", null, 0, 1024, 1, C.TimelineDistance, v => C.TimelineDistance = v, "0"), () => C.Style == CoverflowStyle.Timeline);
-        Conditional(Slider(p, "Window layout angle", null, 0, 60, 0.5, C.TimelineAngle, v => C.TimelineAngle = v, "0.0Â°"), () => C.Style == CoverflowStyle.Timeline);
-        Conditional(Slider(p, "Window tilt angle", null, 0, 90, 0.5, C.TimelineTiltAngle, v => C.TimelineTiltAngle = v, "0.0Â°"), () => C.Style == CoverflowStyle.Timeline);
+        Conditional(Slider(p, "Window layout angle", null, 0, 60, 0.5, C.TimelineAngle, v => C.TimelineAngle = v, "0.0°"), () => C.Style == CoverflowStyle.Timeline);
+        Conditional(Slider(p, "Window tilt angle", null, 0, 90, 0.5, C.TimelineTiltAngle, v => C.TimelineTiltAngle = v, "0.0°"), () => C.Style == CoverflowStyle.Timeline);
         Conditional(Toggle(p, "Enable window scaling", "Windows further back get smaller", C.TimelineScaleWithDistance, v => C.TimelineScaleWithDistance = v), () => C.Style == CoverflowStyle.Timeline);
         Conditional(Slider(p, "Window scaling factor", null, 0.3, 1, 0.01, C.TimelineScalingFactor, v => C.TimelineScalingFactor = v, "0.00"), () => C.Style == CoverflowStyle.Timeline);
 
@@ -97,7 +97,7 @@ public partial class AltTabPage : Page
         var keys = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4),
-            Text = "Q or F4 closes the selected window Â· D minimizes every window on this monitor Â· mouse wheel moves the selection Â· click a window to switch to it, click the background to cancel",
+            Text = "Q or F4 closes the selected window · D minimizes every window on this monitor · mouse wheel moves the selection · click a window to switch to it, click the background to cancel",
         };
         keys.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
         p.Children.Add(keys);
